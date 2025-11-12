@@ -71,7 +71,7 @@ Sistema completo de gestión de campañas de email marketing con tracking avanza
 
 ### Prerrequisitos
 - Node.js 18+
-- PostgreSQL 14+
+- PostgreSQL 14+ (o Docker para ejecutar PostgreSQL)
 - Cuenta en Resend.com (para envío de emails)
 
 ### 1. Clonar el repositorio
@@ -80,7 +80,19 @@ git clone <repository-url>
 cd mailingService
 ```
 
-### 2. Configurar Backend
+### 2. Configurar PostgreSQL
+
+**Opción A - Usando Docker (Recomendado):**
+```bash
+# Inicia PostgreSQL con Docker Compose
+docker-compose up -d
+```
+
+**Opción B - Instalación local:**
+- Instala PostgreSQL 14+ y créala base de datos `email_marketing`
+- Ver [DATABASE_SETUP.md](./DATABASE_SETUP.md) para instrucciones detalladas
+
+### 3. Configurar Backend
 
 ```bash
 cd backend
@@ -114,7 +126,7 @@ npm run dev
 
 El backend estará corriendo en `http://localhost:3000`
 
-### 3. Configurar Frontend
+### 4. Configurar Frontend
 
 ```bash
 cd frontend
@@ -327,8 +339,12 @@ npm run lint         # Linter
 ## Troubleshooting
 
 ### Error de conexión a PostgreSQL
+**⚠️ See the detailed [DATABASE_SETUP.md](./DATABASE_SETUP.md) guide for complete setup instructions!**
+
+Quick fixes:
 - Verifica que PostgreSQL esté corriendo
 - Revisa el `DATABASE_URL` en `.env`
+- **Opción recomendada**: Usa Docker: `docker-compose up -d`
 - Crea la base de datos manualmente si no existe:
   ```sql
   CREATE DATABASE email_marketing;
