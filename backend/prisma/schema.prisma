@@ -1,0 +1,150 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  FAILED
+}
+
+enum CampaignContactStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+}
+
+enum EventType {
+  EMAIL_SENT
+  EMAIL_OPENED
+  LINK_CLICKED
+  EMAIL_BOUNCED
+  EMAIL_FAILED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  name         String?
+  role         Role       @default(EDITOR)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  campaigns    Campaign[]
+
+  @@map("users")
+}
+
+model Contact {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String?
+  company      String?
+  phone        String?
+  tags         String[]  @default([])
+  customFields Json?     @map("custom_fields")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  campaignContacts CampaignContact[]
+  events           Event[]
+
+  @@index([email])
+  @@index([tags])
+  @@map("contacts")
+}
+
+model Campaign {
+  id           String         @id @default(uuid())
+  name         String
+  subject      String
+  htmlContent  String         @map("html_content") @db.Text
+  fromEmail    String         @map("from_email")
+  fromName     String         @map("from_name")
+  status       CampaignStatus @default(DRAFT)
+  scheduledAt  DateTime?      @map("scheduled_at")
+  sentAt       DateTime?      @map("sent_at")
+  createdById  String         @map("created_by_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  campaignContacts CampaignContact[]
+  events           Event[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([scheduledAt])
+  @@map("campaigns")
+}
+
+model CampaignContact {
+  id         String                @id @default(uuid())
+  campaignId String                @map("campaign_id")
+  contactId  String                @map("contact_id")
+  status     CampaignContactStatus @default(PENDING)
+  trackToken String                @unique @default(uuid()) @map("track_token")
+  sentAt     DateTime?             @map("sent_at")
+  createdAt  DateTime              @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([trackToken])
+  @@map("campaign_contacts")
+}
+
+model Event {
+  id         String    @id @default(uuid())
+  type       EventType
+  campaignId String    @map("campaign_id")
+  contactId  String    @map("contact_id")
+  metadata   Json?
+  ip         String?
+  userAgent  String?   @map("user_agent") @db.Text
+  country    String?
+  city       String?
+  device     String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("events")
+}
+
+model Template {
+  id          String   @id @default(uuid())
+  name        String
+  htmlContent String   @map("html_content") @db.Text
+  thumbnail   String?
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("templates")
+}
