@@ -2,15 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  body {
+    @apply font-sans text-gray-900 antialiased;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+  }
+
+  * {
+    @apply transition-all duration-200;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+@layer components {
+  /* Buttons */
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-xl hover:from-primary-700 hover:to-primary-800 font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 hover:border-primary-300 font-semibold transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 active:scale-95;
+  }
+
+  .btn-accent {
+    @apply bg-gradient-to-r from-accent-500 to-accent-600 text-white px-6 py-3 rounded-xl hover:from-accent-600 hover:to-accent-700 font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95;
+  }
+
+  .btn-success {
+    @apply bg-gradient-to-r from-success-500 to-success-600 text-white px-6 py-3 rounded-xl hover:from-success-600 hover:to-success-700 font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95;
+  }
+
+  .btn-danger {
+    @apply bg-gradient-to-r from-danger-500 to-danger-600 text-white px-6 py-3 rounded-xl hover:from-danger-600 hover:to-danger-700 font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95;
+  }
+
+  /* Input Fields */
+  .input-field {
+    @apply w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-primary-100 focus:border-primary-500 transition-all duration-300 bg-white;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+  }
+
+  .card-gradient {
+    @apply bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+  }
+
+  /* Badges */
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700 border border-primary-200;
+  }
+
+  .badge-success {
+    @apply badge bg-success-100 text-success-700 border border-success-200;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning-100 text-warning-700 border border-warning-200;
+  }
+
+  .badge-danger {
+    @apply badge bg-danger-100 text-danger-700 border border-danger-200;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent-100 text-accent-700 border border-accent-200;
+  }
+
+  /* Stats Cards */
+  .stat-card {
+    @apply bg-white rounded-2xl p-6 shadow-lg border-l-4 hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+  }
+
+  .stat-card-primary {
+    @apply stat-card border-primary-500;
+  }
+
+  .stat-card-accent {
+    @apply stat-card border-accent-500;
+  }
+
+  .stat-card-success {
+    @apply stat-card border-success-500;
+  }
+
+  .stat-card-warning {
+    @apply stat-card border-warning-500;
+  }
+
+  /* Icon Containers */
+  .icon-container {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+  }
+
+  .icon-container-primary {
+    @apply icon-container bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg;
+  }
+
+  .icon-container-accent {
+    @apply icon-container bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-lg;
+  }
+
+  .icon-container-success {
+    @apply icon-container bg-gradient-to-br from-success-500 to-success-600 text-white shadow-lg;
+  }
+
+  .icon-container-warning {
+    @apply icon-container bg-gradient-to-br from-warning-500 to-warning-600 text-white shadow-lg;
+  }
+
+  /* Animations */
+  .animate-on-hover {
+    @apply transition-all duration-300 hover:scale-105 hover:shadow-xl;
+  }
+
+  /* Glass Effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-lg border border-white/20;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent font-bold;
+  }
 }

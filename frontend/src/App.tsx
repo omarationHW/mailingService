@@ -38,7 +38,6 @@ export default function App() {
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="templates" element={<Templates />} />
-        <Route path="analytics" element={<Dashboard />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

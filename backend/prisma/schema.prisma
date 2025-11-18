@@ -75,6 +75,7 @@ model Campaign {
   id           String         @id @default(uuid())
   name         String
   subject      String
+  preheader    String?
   htmlContent  String         @map("html_content") @db.Text
   fromEmail    String         @map("from_email")
   fromName     String         @map("from_name")

@@ -7,6 +7,7 @@ import emailService from '../services/emailService';
 const campaignSchema = z.object({
   name: z.string().min(1),
   subject: z.string().min(1),
+  preheader: z.string().optional(),
   htmlContent: z.string().min(1),
   fromEmail: z.string().email(),
   fromName: z.string().min(1),
@@ -123,6 +124,7 @@ export const createCampaign = async (req: Request, res: Response) => {
       data: {
         name: data.name,
         subject: data.subject,
+        preheader: data.preheader,
         htmlContent: data.htmlContent,
         fromEmail: data.fromEmail,
         fromName: data.fromName,
@@ -135,17 +137,22 @@ export const createCampaign = async (req: Request, res: Response) => {
     let contacts = [];
 
     if (data.contactIds && data.contactIds.length > 0) {
+      // Si se especifican contactIds, usar solo esos
       contacts = await prisma.contact.findMany({
         where: {
           id: { in: data.contactIds },
         },
       });
     } else if (data.tags && data.tags.length > 0) {
+      // Si se especifican tags, filtrar por tags
       contacts = await prisma.contact.findMany({
         where: {
           tags: { hasSome: data.tags },
         },
       });
+    } else {
+      // Si no se especifica nada, usar TODOS los contactos
+      contacts = await prisma.contact.findMany();
     }
 
     if (contacts.length > 0) {
@@ -267,8 +274,43 @@ export const sendCampaign = async (req: Request, res: Response) => {
         .json({ error: 'Campaign has already been sent or is currently sending' });
     }
 
+    // Si la campaña no tiene contactos asociados, asociar todos los contactos automáticamente
     if (campaign.campaignContacts.length === 0) {
-      return res.status(400).json({ error: 'No contacts to send to' });
+      const allContacts = await prisma.contact.findMany();
+
+      if (allContacts.length === 0) {
+        return res.status(400).json({ error: 'No contacts available in the system' });
+      }
+
+      // Asociar todos los contactos a esta campaña
+      await prisma.campaignContact.createMany({
+        data: allContacts.map((contact) => ({
+          campaignId: campaign.id,
+          contactId: contact.id,
+          status: CampaignContactStatus.PENDING,
+        })),
+      });
+
+      // Recargar la campaña con los contactos recién asociados
+      const updatedCampaign = await prisma.campaign.findUnique({
+        where: { id },
+        include: {
+          campaignContacts: {
+            where: {
+              status: CampaignContactStatus.PENDING,
+            },
+            include: {
+              contact: true,
+            },
+          },
+        },
+      });
+
+      if (!updatedCampaign) {
+        return res.status(404).json({ error: 'Campaign not found after update' });
+      }
+
+      campaign.campaignContacts = updatedCampaign.campaignContacts;
     }
 
     await prisma.campaign.update({
