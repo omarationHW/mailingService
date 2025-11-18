@@ -34,7 +34,7 @@ NODE_ENV=production
 PORT=3001
 
 # Resend API
-RESEND_API_KEY=re_ULSdEASZ_JSyD8F16jZB7KCVcNZhfFD5p
+RESEND_API_KEY=""
 
 # App URLs (IMPORTANTE: Cambiar cuando tengas el dominio de Railway)
 # Primero usa la URL temporal de Railway, luego cámbiala a tu dominio custom
@@ -47,6 +47,7 @@ RATE_LIMIT_MAX_REQUESTS=100
 ```
 
 **IMPORTANTE:**
+
 - `DATABASE_URL` se configura automáticamente por Railway, NO la agregues manualmente
 - Después del primer deploy, Railway te dará una URL como `https://mailingservice-production-xxxx.up.railway.app`
 - Actualiza `APP_URL` con esa URL de Railway
@@ -79,11 +80,13 @@ RATE_LIMIT_MAX_REQUESTS=100
 ## Paso 7: Ejecutar Migraciones
 
 Las migraciones se ejecutan automáticamente durante el build gracias a:
+
 ```
 npm run build → incluye "npx prisma migrate deploy"
 ```
 
 Si necesitas ejecutarlas manualmente:
+
 1. Ve a tu servicio en Railway
 2. Settings → Deploy → Command
 3. Ejecuta: `npx prisma migrate deploy`
@@ -91,11 +94,13 @@ Si necesitas ejecutarlas manualmente:
 ## Paso 8: Verificar que funciona
 
 Prueba tu API:
+
 ```bash
 curl https://api.campaigns.xy.tech/health
 ```
 
 Deberías recibir:
+
 ```json
 {
   "status": "ok",
@@ -108,6 +113,7 @@ Deberías recibir:
 Una vez que tu backend esté en Railway, actualiza el frontend:
 
 En `frontend/src/api/client.ts`, cambia:
+
 ```typescript
 baseURL: 'https://api.campaigns.xy.tech/api'
 ```
@@ -115,14 +121,17 @@ baseURL: 'https://api.campaigns.xy.tech/api'
 ## Troubleshooting
 
 ### Error: "Cannot find module"
+
 - Asegúrate de que todas las dependencias estén en `dependencies` (no en `devDependencies`)
 - Ejecuta `npm install` localmente y haz commit del `package-lock.json`
 
 ### Error: "Database connection failed"
+
 - Verifica que Railway haya creado la base de datos PostgreSQL
 - Verifica que `DATABASE_URL` esté configurada automáticamente
 
 ### Error: "Prisma migrations failed"
+
 - Ve a Railway → Settings → Deploy Command
 - Ejecuta manualmente: `npx prisma migrate deploy`
 
