@@ -40,7 +40,8 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-const limiter = rateLimit({
+// Rate limiter for general API endpoints
+const apiLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.maxRequests,
   message: 'Too many requests from this IP, please try again later.',
@@ -48,18 +49,25 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/', limiter);
+// More permissive rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // 50 requests per window
+  message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/contacts', contactRoutes);
-app.use('/api/templates', templateRoutes);
-app.use('/api/campaigns', campaignRoutes);
-app.use('/api/track', trackingRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/contacts', apiLimiter, contactRoutes);
+app.use('/api/templates', apiLimiter, templateRoutes);
+app.use('/api/campaigns', apiLimiter, campaignRoutes);
+app.use('/api/track', trackingRoutes); // No rate limit for tracking (email opens/clicks)
+app.use('/api/analytics', apiLimiter, analyticsRoutes);
 
 app.use(errorHandler);
 
