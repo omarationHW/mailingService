@@ -13,6 +13,11 @@ import analyticsRoutes from './routes/analyticsRoutes';
 
 const app = express();
 
+// Trust proxy for Railway/production environments
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Support multiple origins (comma-separated)
 const allowedOrigins = config.app.frontendUrl.split(',').map(origin => origin.trim());
 
