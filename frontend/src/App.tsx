@@ -10,6 +10,8 @@ import Campaigns from './pages/Campaigns';
 import NewCampaign from './pages/NewCampaign';
 import CampaignDetail from './pages/CampaignDetail';
 import Contacts from './pages/Contacts';
+import ContactLists from './pages/ContactLists';
+import ContactListDetail from './pages/ContactListDetail';
 import Templates from './pages/Templates';
 
 export default function App() {
@@ -37,6 +39,8 @@ export default function App() {
         <Route path="campaigns/new" element={<NewCampaign />} />
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="contacts" element={<Contacts />} />
+        <Route path="contact-lists" element={<ContactLists />} />
+        <Route path="contact-lists/:id" element={<ContactListDetail />} />
         <Route path="templates" element={<Templates />} />
       </Route>
 

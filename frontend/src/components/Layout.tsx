@@ -7,6 +7,7 @@ import {
   FileText,
   LogOut,
   Sparkles,
+  List,
 } from 'lucide-react';
 
 export default function Layout() {
@@ -25,6 +26,7 @@ export default function Layout() {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard', gradient: 'from-blue-500 to-purple-600' },
     { path: '/campaigns', icon: Mail, label: 'Campaigns', gradient: 'from-purple-500 to-pink-600' },
     { path: '/contacts', icon: Users, label: 'Contacts', gradient: 'from-pink-500 to-rose-600' },
+    { path: '/contact-lists', icon: List, label: 'Contact Lists', gradient: 'from-rose-500 to-pink-600' },
     { path: '/templates', icon: FileText, label: 'Templates', gradient: 'from-orange-500 to-red-600' },
   ];
 
