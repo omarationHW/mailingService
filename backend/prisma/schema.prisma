@@ -63,12 +63,40 @@ model Contact {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  campaignContacts CampaignContact[]
-  events           Event[]
+  campaignContacts  CampaignContact[]
+  events            Event[]
+  contactListMembers ContactListMember[]
 
   @@index([email])
   @@index([tags])
   @@map("contacts")
+}
+
+model ContactList {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members ContactListMember[]
+
+  @@map("contact_lists")
+}
+
+model ContactListMember {
+  id            String   @id @default(uuid())
+  contactListId String   @map("contact_list_id")
+  contactId     String   @map("contact_id")
+  addedAt       DateTime @default(now()) @map("added_at")
+
+  contactList ContactList @relation(fields: [contactListId], references: [id], onDelete: Cascade)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactListId, contactId])
+  @@index([contactListId])
+  @@index([contactId])
+  @@map("contact_list_members")
 }
 
 model Campaign {

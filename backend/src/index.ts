@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 import authRoutes from './routes/authRoutes';
 import contactRoutes from './routes/contactRoutes';
+import contactListRoutes from './routes/contactListRoutes';
 import templateRoutes from './routes/templateRoutes';
 import campaignRoutes from './routes/campaignRoutes';
 import trackingRoutes from './routes/trackingRoutes';
@@ -64,6 +65,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/contacts', apiLimiter, contactRoutes);
+app.use('/api/contact-lists', apiLimiter, contactListRoutes);
 app.use('/api/templates', apiLimiter, templateRoutes);
 app.use('/api/campaigns', apiLimiter, campaignRoutes);
 app.use('/api/track', trackingRoutes); // No rate limit for tracking (email opens/clicks)
@@ -90,6 +92,12 @@ Available endpoints:
   POST   /api/contacts
   POST   /api/contacts/import
   GET    /api/contacts/export
+
+  GET    /api/contact-lists
+  POST   /api/contact-lists
+  GET    /api/contact-lists/:id
+  POST   /api/contact-lists/:id/contacts
+  DELETE /api/contact-lists/:id/contacts/:contactId
 
   GET    /api/templates
   POST   /api/templates
