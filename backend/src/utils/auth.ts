@@ -15,8 +15,8 @@ export const comparePassword = async (
 
 export const generateToken = (userId: string): string => {
   return jwt.sign({ userId }, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
-  });
+    expiresIn: config.jwt.expiresIn as string,
+  } as jwt.SignOptions);
 };
 
 export const verifyToken = (token: string): { userId: string } => {

@@ -270,7 +270,7 @@ export const importContacts = async (req: Request, res: Response) => {
   }
 };
 
-export const exportContacts = async (req: Request, res: Response) => {
+export const exportContacts = async (_req: Request, res: Response) => {
   try {
     const contacts = await prisma.contact.findMany({
       orderBy: { createdAt: 'desc' },

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { EventType } from '@prisma/client';
 
-export const getDashboardAnalytics = async (req: Request, res: Response) => {
+export const getDashboardAnalytics = async (_req: Request, res: Response) => {
   try {
     const [
       totalCampaigns,
