@@ -13,9 +13,21 @@ import analyticsRoutes from './routes/analyticsRoutes';
 
 const app = express();
 
+// Support multiple origins (comma-separated)
+const allowedOrigins = config.app.frontendUrl.split(',').map(origin => origin.trim());
+
 app.use(
   cors({
-    origin: config.app.frontendUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
