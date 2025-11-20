@@ -63,50 +63,49 @@ export default function Templates() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-600"></div>
-          <p className="mt-4 text-lg font-semibold text-gray-700">Cargando plantillas...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="mt-2 text-sm text-gray-600">Cargando plantillas...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 rounded-3xl p-8 shadow-2xl animate-fade-in">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwdjJoLTYweiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-30" />
-          <div className="relative z-10 flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-extrabold text-white mb-2 drop-shadow-lg">Plantillas</h1>
-              <p className="text-white/90 text-lg font-medium">Crea y gestiona plantillas de email reutilizables</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+              <FileText className="w-6 h-6 text-amber-600" />
             </div>
-            <button
-              onClick={() => { setEditingTemplate(null); setShowModal(true); }}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus size={20} />
-              Nueva Plantilla
-            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {templates.length} {templates.length === 1 ? 'Plantilla' : 'Plantillas'}
+              </h2>
+              <p className="text-sm text-gray-600">Diseños reutilizables para tus campañas</p>
+            </div>
           </div>
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+          <button
+            onClick={() => { setEditingTemplate(null); setShowModal(true); }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={16} />
+            <span className="text-sm">Nueva Plantilla</span>
+          </button>
         </div>
 
         {/* Templates Grid or Empty State */}
         {templates.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-16 text-center animate-scale-in">
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <div className="max-w-md mx-auto">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto">
-                  <FileText className="w-12 h-12 text-orange-600" />
-                </div>
-                <div className="absolute top-0 right-1/4 w-16 h-16 bg-gradient-to-br from-red-400 to-orange-400 rounded-full blur-2xl opacity-30 animate-pulse-slow" />
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-amber-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">No hay plantillas aún</h3>
-              <p className="text-gray-600 mb-8 text-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay plantillas aún</h3>
+              <p className="text-gray-600 text-sm mb-6">
                 Crea plantillas reutilizables para tus campañas de email
               </p>
               <button
@@ -119,69 +118,61 @@ export default function Templates() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {templates.map((template) => (
               <div
                 key={template.id}
-                className="group relative bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
               >
-                {/* Gradient Background */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
-
-                {/* Content */}
-                <div className="relative z-10">
-                  {/* Card Header */}
-                  <div className="p-6 border-b border-gray-100">
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/50 transform group-hover:scale-110 transition-transform duration-300">
-                        <FileText className="w-7 h-7 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-gray-900 truncate mb-1">
-                          {template.name}
-                        </h3>
-                        {template.description && (
-                          <p className="text-sm text-gray-600 line-clamp-2">
-                            {template.description}
-                          </p>
-                        )}
-                      </div>
+                {/* Card Header */}
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate mb-1">
+                        {template.name}
+                      </h3>
+                      {template.description && (
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {template.description}
+                        </p>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Code Preview */}
-                  <div className="p-4 bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-6 h-6 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center">
-                        <Code className="w-4 h-4 text-orange-700" />
-                      </div>
-                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Vista previa</span>
-                    </div>
-                    <div className="bg-gray-900 rounded-xl p-4 max-h-32 overflow-auto shadow-inner">
-                      <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
-                        {template.htmlContent.substring(0, 150)}...
-                      </pre>
-                    </div>
+                {/* Code Preview */}
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Code className="w-4 h-4 text-gray-500" />
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">HTML</span>
                   </div>
+                  <div className="bg-gray-900 rounded-lg p-3 max-h-24 overflow-auto">
+                    <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
+                      {template.htmlContent.substring(0, 120)}...
+                    </pre>
+                  </div>
+                </div>
 
-                  {/* Card Actions */}
-                  <div className="p-4 flex gap-2">
-                    <button
-                      onClick={() => { setEditingTemplate(template); setShowModal(true); }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 font-semibold transition-all duration-300 shadow-md hover:shadow-lg"
-                      title="Editar"
-                    >
-                      <Edit size={18} />
-                      <span>Editar</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(template.id)}
-                      className="px-3 py-2.5 bg-gradient-to-r from-danger-500 to-danger-600 text-white rounded-xl hover:from-danger-600 hover:to-danger-700 font-semibold transition-all duration-300 shadow-md hover:shadow-lg"
-                      title="Eliminar"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+                {/* Card Actions */}
+                <div className="p-4 flex gap-2">
+                  <button
+                    onClick={() => { setEditingTemplate(template); setShowModal(true); }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    title="Editar"
+                  >
+                    <Edit size={16} />
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(template.id)}
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -190,8 +181,8 @@ export default function Templates() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">
@@ -216,7 +207,7 @@ export default function Templates() {
                   type="text"
                   placeholder="Ej: Bienvenida a Nuevos Clientes"
                   defaultValue={editingTemplate?.name}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                   required
                 />
               </div>
@@ -230,7 +221,7 @@ export default function Templates() {
                   type="text"
                   placeholder="Breve descripción de la plantilla"
                   defaultValue={editingTemplate?.description}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                 />
               </div>
 
@@ -243,7 +234,7 @@ export default function Templates() {
                   rows={16}
                   placeholder="<html>&#10;  <body>&#10;    Tu contenido aquí...&#10;  </body>&#10;</html>"
                   defaultValue={editingTemplate?.htmlContent}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition font-mono text-sm resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition font-mono text-sm resize-none"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
@@ -254,14 +245,14 @@ export default function Templates() {
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="submit"
-                  className="flex-1 bg-primary-600 text-white py-2.5 rounded-lg hover:bg-primary-700 font-medium transition shadow-sm hover:shadow-md"
+                  className="flex-1 btn-primary"
                 >
-                  {editingTemplate ? 'Actualizar Plantilla' : 'Crear Plantilla'}
+                  {editingTemplate ? 'Actualizar' : 'Crear'}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); setEditingTemplate(null); }}
-                  className="flex-1 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg hover:bg-gray-50 font-medium transition"
+                  className="flex-1 btn-secondary"
                 >
                   Cancelar
                 </button>

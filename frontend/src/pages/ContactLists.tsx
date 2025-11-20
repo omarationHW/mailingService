@@ -64,72 +64,104 @@ export default function ContactLists() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-pink-200 border-t-pink-600"></div>
-          <p className="mt-4 text-lg font-semibold text-gray-700">Cargando listas...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="mt-2 text-sm text-gray-600">Cargando listas...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
-              Listas de Contactos
-            </h1>
-            <p className="text-gray-600">Organiza tus contactos en grupos para tus campañas</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <List className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {lists.length} {lists.length === 1 ? 'Lista' : 'Listas'}
+              </h2>
+              <p className="text-sm text-gray-600">Organiza tus contactos en grupos</p>
+            </div>
           </div>
           <button
             onClick={() => {
               setEditingList(null);
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all"
+            className="btn-primary flex items-center gap-2"
           >
-            <Plus size={20} />
-            Nueva Lista
+            <Plus size={16} />
+            <span className="text-sm">Nueva Lista</span>
           </button>
         </div>
 
         {/* Search */}
-        <div className="mb-6 relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder="Buscar listas..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
-          />
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Buscar listas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+            />
+          </div>
         </div>
 
-        {/* Lists Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {lists.map((list) => (
-            <div
-              key={list.id}
-              className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-100 overflow-hidden"
-            >
-              <div className="p-6">
+        {/* Lists Grid or Empty State */}
+        {lists.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <List className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {search ? 'No se encontraron listas' : 'No hay listas de contactos'}
+              </h3>
+              <p className="text-gray-600 text-sm mb-6">
+                {search ? 'Intenta con otro término de búsqueda' : 'Crea tu primera lista para organizar tus contactos'}
+              </p>
+              {!search && (
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <Plus size={20} />
+                  Crear Primera Lista
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {lists.map((list) => (
+              <div
+                key={list.id}
+                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <List className="text-pink-600" size={20} />
-                      <h3 className="text-xl font-bold text-gray-900">{list.name}</h3>
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <List className="text-blue-600" size={18} />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">{list.name}</h3>
                     </div>
                     {list.description && (
-                      <p className="text-sm text-gray-600 line-clamp-2">{list.description}</p>
+                      <p className="text-sm text-gray-600 line-clamp-2 ml-12">{list.description}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg">
-                  <Users className="text-pink-600" size={18} />
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                  <Users className="text-gray-600" size={16} />
                   <span className="text-sm font-medium text-gray-700">
                     {list._count?.members || 0} contacto{list._count?.members !== 1 ? 's' : ''}
                   </span>
@@ -138,7 +170,7 @@ export default function ContactLists() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate(`/contact-lists/${list.id}`)}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg hover:shadow-md transition-all text-sm font-medium"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                   >
                     Ver Lista
                   </button>
@@ -147,46 +179,29 @@ export default function ContactLists() {
                       setEditingList(list);
                       setShowModal(true);
                     }}
-                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
                   >
-                    <Edit size={18} />
+                    <Edit size={16} />
                   </button>
                   <button
                     onClick={() => handleDelete(list.id)}
-                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-colors"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {lists.length === 0 && (
-          <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full mb-4">
-              <List className="text-pink-600" size={32} />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay listas de contactos</h3>
-            <p className="text-gray-600 mb-6">Crea tu primera lista para organizar tus contactos</p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all"
-            >
-              <Plus size={20} />
-              Crear Primera Lista
-            </button>
+            ))}
           </div>
         )}
 
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-xl font-bold text-gray-900">
                     {editingList ? 'Editar Lista' : 'Nueva Lista'}
                   </h2>
                   <button
@@ -202,7 +217,7 @@ export default function ContactLists() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Nombre de la Lista *
                     </label>
                     <input
@@ -210,20 +225,20 @@ export default function ContactLists() {
                       name="name"
                       defaultValue={editingList?.name}
                       required
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                       placeholder="Ej: Clientes VIP"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Descripción
                     </label>
                     <textarea
                       name="description"
                       defaultValue={editingList?.description}
                       rows={3}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
                       placeholder="Describe el propósito de esta lista..."
                     />
                   </div>
@@ -235,13 +250,13 @@ export default function ContactLists() {
                         setShowModal(false);
                         setEditingList(null);
                       }}
-                      className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="flex-1 btn-secondary"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all"
+                      className="flex-1 btn-primary"
                     >
                       {editingList ? 'Actualizar' : 'Crear'}
                     </button>

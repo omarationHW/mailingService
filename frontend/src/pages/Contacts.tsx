@@ -93,80 +93,79 @@ export default function Contacts() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-8 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-pink-200 border-t-pink-600"></div>
-          <p className="mt-4 text-lg font-semibold text-gray-700">Cargando contactos...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="mt-2 text-sm text-gray-600">Cargando contactos...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 rounded-3xl p-8 shadow-2xl animate-fade-in">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwdjJoLTYweiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-30" />
-          <div className="relative z-10 flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-extrabold text-white mb-2 drop-shadow-lg">Contactos</h1>
-              <p className="text-white/90 text-lg font-medium">Gestiona tu lista de contactos</p>
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header Actions */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Users className="w-6 h-6 text-emerald-600" />
             </div>
-            <div className="flex gap-3">
-              <label className="cursor-pointer btn-secondary flex items-center gap-2">
-                <Upload size={18} />
-                Importar CSV
-                <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
-              </label>
-              <button
-                onClick={handleExport}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <Download size={18} />
-                Exportar
-              </button>
-              <button
-                onClick={() => { setEditingContact(null); setShowModal(true); }}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus size={18} />
-                Agregar Contacto
-              </button>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {contacts.length} {contacts.length === 1 ? 'Contacto' : 'Contactos'}
+              </h2>
+              <p className="text-sm text-gray-600">Gestiona tu base de datos</p>
             </div>
           </div>
-          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+          <div className="flex gap-2">
+            <label className="cursor-pointer btn-secondary flex items-center gap-2">
+              <Upload size={16} />
+              <span className="text-sm">Importar</span>
+              <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
+            </label>
+            <button
+              onClick={handleExport}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Download size={16} />
+              <span className="text-sm">Exportar</span>
+            </button>
+            <button
+              onClick={() => { setEditingContact(null); setShowModal(true); }}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus size={16} />
+              <span className="text-sm">Nuevo Contacto</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="relative">
-            <Search size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar por email, nombre o empresa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-pink-100 focus:border-pink-500 transition-all duration-300 bg-white text-lg"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
             />
           </div>
         </div>
 
         {/* Contacts Grid or Empty State */}
         {contacts.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-16 text-center animate-scale-in">
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <div className="max-w-md mx-auto">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center mx-auto">
-                  <Users className="w-12 h-12 text-pink-600" />
-                </div>
-                <div className="absolute top-0 right-1/4 w-16 h-16 bg-gradient-to-br from-rose-400 to-pink-400 rounded-full blur-2xl opacity-30 animate-pulse-slow" />
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-emerald-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 {search ? 'No se encontraron contactos' : 'No hay contactos aún'}
               </h3>
-              <p className="text-gray-600 mb-8 text-lg">
+              <p className="text-gray-600 text-sm mb-6">
                 {search ? 'Intenta con otro término de búsqueda' : 'Comienza agregando tu primer contacto'}
               </p>
               {!search && (
@@ -181,75 +180,69 @@ export default function Contacts() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {contacts.map((contact) => (
               <div
                 key={contact.id}
-                className="group relative bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 overflow-hidden"
+                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
               >
-                {/* Gradient Background */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-pink-500/10 to-rose-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500" />
-
-                {/* Content */}
-                <div className="relative z-10">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/50 transform group-hover:scale-110 transition-transform duration-300">
-                      <Users className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setEditingContact(contact); setShowModal(true); }}
-                        className="p-2 bg-gradient-to-r from-primary-100 to-primary-200 text-primary-700 hover:from-primary-500 hover:to-primary-600 hover:text-white rounded-lg transition-all duration-300"
-                        title="Editar"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(contact.id)}
-                        className="p-2 bg-gradient-to-r from-danger-100 to-danger-200 text-danger-700 hover:from-danger-500 hover:to-danger-600 hover:text-white rounded-lg transition-all duration-300"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <Users className="w-6 h-6 text-emerald-600" />
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setEditingContact(contact); setShowModal(true); }}
+                      className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(contact.id)}
+                      className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
 
-                  {/* Contact Info */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1 truncate">
-                      {contact.name || contact.email}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                      <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">{contact.email}</span>
+                {/* Contact Info */}
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
+                    {contact.name || contact.email}
+                  </h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                    <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{contact.email}</span>
+                  </div>
+                  {contact.company && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{contact.company}</span>
                     </div>
-                    {contact.company && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span className="truncate">{contact.company}</span>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                </div>
 
-                  {/* Tags */}
-                  <div className="pt-4 border-t border-gray-100">
-                    {contact.tags.length > 0 ? (
-                      <div className="flex gap-2 flex-wrap">
-                        {contact.tags.map((tag, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center gap-1.5 bg-gradient-to-r from-pink-100 to-rose-100 text-pink-700 text-xs px-3 py-1.5 rounded-full border border-pink-200 font-semibold"
-                          >
-                            <Tag className="w-3 h-3" />
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400 italic">Sin etiquetas</p>
-                    )}
-                  </div>
+                {/* Tags */}
+                <div className="pt-4 border-t border-gray-200">
+                  {contact.tags.length > 0 ? (
+                    <div className="flex gap-2 flex-wrap">
+                      {contact.tags.map((tag, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-md font-medium"
+                        >
+                          <Tag className="w-3 h-3" />
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">Sin etiquetas</p>
+                  )}
                 </div>
               </div>
             ))}
