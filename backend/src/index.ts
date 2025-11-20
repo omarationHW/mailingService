@@ -12,6 +12,7 @@ import campaignRoutes from './routes/campaignRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 
+// Force redeploy to run migrations for contact lists feature
 const app = express();
 
 // Trust proxy for Railway/production environments
