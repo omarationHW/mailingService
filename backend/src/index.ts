@@ -3,12 +3,14 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import sequenceService from './services/sequenceService';
 
 import authRoutes from './routes/authRoutes';
 import contactRoutes from './routes/contactRoutes';
 import contactListRoutes from './routes/contactListRoutes';
 import templateRoutes from './routes/templateRoutes';
 import campaignRoutes from './routes/campaignRoutes';
+import sequenceRoutes from './routes/sequenceRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 
@@ -69,6 +71,7 @@ app.use('/api/contacts', apiLimiter, contactRoutes);
 app.use('/api/contact-lists', apiLimiter, contactListRoutes);
 app.use('/api/templates', apiLimiter, templateRoutes);
 app.use('/api/campaigns', apiLimiter, campaignRoutes);
+app.use('/api/sequences', apiLimiter, sequenceRoutes);
 app.use('/api/track', trackingRoutes); // No rate limit for tracking (email opens/clicks)
 app.use('/api/analytics', apiLimiter, analyticsRoutes);
 
@@ -107,12 +110,21 @@ Available endpoints:
   POST   /api/campaigns
   POST   /api/campaigns/:id/send
 
+  GET    /api/sequences
+  POST   /api/sequences
+  GET    /api/sequences/:id
+  POST   /api/sequences/:id/enroll
+  GET    /api/sequences/:id/enrollments
+
   GET    /api/track/open/:token
   GET    /api/track/click/:token
 
   GET    /api/analytics/dashboard
   GET    /api/analytics/campaigns/:id
   `);
+
+  // Start sequence automation worker
+  sequenceService.startWorker(60000); // Check every 60 seconds
 });
 
 export default app;

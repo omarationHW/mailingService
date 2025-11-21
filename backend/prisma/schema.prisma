@@ -66,6 +66,7 @@ model Contact {
   campaignContacts  CampaignContact[]
   events            Event[]
   contactListMembers ContactListMember[]
+  sequenceEnrollments SequenceEnrollment[]
 
   @@index([email])
   @@index([tags])
@@ -176,4 +177,106 @@ model Template {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("templates")
+}
+
+enum SequenceStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SequenceTriggerType {
+  MANUAL
+  CONTACT_CREATED
+  LIST_ADDED
+  TAG_ADDED
+  EMAIL_OPENED
+  LINK_CLICKED
+}
+
+enum SequenceStepStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Sequence {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  status      SequenceStatus @default(ACTIVE)
+  triggerType SequenceTriggerType @map("trigger_type")
+  triggerValue String?       @map("trigger_value")
+  fromEmail   String         @map("from_email")
+  fromName    String         @map("from_name")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  steps       SequenceStep[]
+  enrollments SequenceEnrollment[]
+
+  @@map("sequences")
+}
+
+model SequenceStep {
+  id           String   @id @default(uuid())
+  sequenceId   String   @map("sequence_id")
+  stepOrder    Int      @map("step_order")
+  name         String
+  subject      String
+  htmlContent  String   @map("html_content") @db.Text
+  delayDays    Int      @default(0) @map("delay_days")
+  delayHours   Int      @default(0) @map("delay_hours")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sequence     Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  executions   SequenceStepExecution[]
+
+  @@unique([sequenceId, stepOrder])
+  @@index([sequenceId])
+  @@map("sequence_steps")
+}
+
+model SequenceEnrollment {
+  id         String   @id @default(uuid())
+  sequenceId String   @map("sequence_id")
+  contactId  String   @map("contact_id")
+  status     SequenceStatus @default(ACTIVE)
+  enrolledAt DateTime @default(now()) @map("enrolled_at")
+  completedAt DateTime? @map("completed_at")
+  pausedAt   DateTime? @map("paused_at")
+
+  sequence   Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  executions SequenceStepExecution[]
+
+  @@unique([sequenceId, contactId])
+  @@index([sequenceId])
+  @@index([contactId])
+  @@index([status])
+  @@map("sequence_enrollments")
+}
+
+model SequenceStepExecution {
+  id           String             @id @default(uuid())
+  enrollmentId String             @map("enrollment_id")
+  stepId       String             @map("step_id")
+  status       SequenceStepStatus @default(PENDING)
+  scheduledFor DateTime           @map("scheduled_for")
+  sentAt       DateTime?          @map("sent_at")
+  trackToken   String             @unique @default(uuid()) @map("track_token")
+  error        String?            @db.Text
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  enrollment SequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  step       SequenceStep       @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, stepId])
+  @@index([enrollmentId])
+  @@index([stepId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("sequence_step_executions")
 }

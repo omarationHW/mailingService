@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Plus,
   Send,
+  Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -41,6 +42,12 @@ export default function Layout() {
       icon: Mail,
       label: 'Campañas',
       description: 'Gestiona tus emails'
+    },
+    {
+      path: '/sequences',
+      icon: Zap,
+      label: 'Secuencias',
+      description: 'Automatización'
     },
     {
       path: '/contacts',
