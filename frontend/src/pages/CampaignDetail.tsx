@@ -292,7 +292,7 @@ export default function CampaignDetail() {
                     outerRadius={100}
                     label={({ device, count }) => `${device}: ${count}`}
                   >
-                    {data.deviceStats.map((entry, index) => (
+                    {data.deviceStats.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

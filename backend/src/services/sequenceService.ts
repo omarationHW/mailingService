@@ -84,7 +84,7 @@ export class SequenceService {
 
         // Send the email
         const result = await emailService.sendEmail({
-          campaignId: execution.step.sequenceId, // Use sequence ID as campaign ID for tracking
+          // Note: campaignId is omitted for sequence emails (no campaign association)
           contactId: execution.enrollment.contactId,
           trackToken: execution.trackToken,
           to: execution.enrollment.contact.email,
@@ -95,6 +95,8 @@ export class SequenceService {
           subject: execution.step.subject,
           html: execution.step.htmlContent,
           variables,
+          sequenceId: execution.step.sequenceId,
+          sequenceStepExecutionId: execution.id,
         });
 
         if (result.success) {

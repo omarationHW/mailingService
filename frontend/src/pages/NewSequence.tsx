@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sequencesApi, CreateSequenceStep, SequenceTriggerType } from '../api/sequences';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, Trash2, Zap, Clock, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Zap, Clock, Mail, Calendar } from 'lucide-react';
 
 export default function NewSequence() {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ export default function NewSequence() {
       name: 'Email 1',
       subject: '',
       htmlContent: '',
+      schedulingType: 'RELATIVE_DELAY',
       delayDays: 0,
       delayHours: 0,
     },
@@ -30,6 +31,7 @@ export default function NewSequence() {
         name: `Email ${steps.length + 1}`,
         subject: '',
         htmlContent: '',
+        schedulingType: 'RELATIVE_DELAY',
         delayDays: steps.length === 0 ? 0 : 2,
         delayHours: 0,
       },
@@ -235,35 +237,76 @@ export default function NewSequence() {
 
                   {index > 0 && (
                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-3">
                         <Clock className="text-gray-500" size={16} />
                         <span className="text-sm font-semibold text-gray-700">
-                          Esperar después del paso anterior:
+                          Programación del paso:
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Días</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={step.delayDays}
-                            onChange={(e) => updateStep(index, 'delayDays', parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Horas</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="23"
-                            value={step.delayHours}
-                            onChange={(e) => updateStep(index, 'delayHours', parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
-                          />
-                        </div>
+
+                      {/* Scheduling Type Toggle */}
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => updateStep(index, 'schedulingType', 'RELATIVE_DELAY')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            step.schedulingType === 'RELATIVE_DELAY'
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Clock className="w-4 h-4 inline mr-1.5" />
+                          Delay Relativo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateStep(index, 'schedulingType', 'ABSOLUTE_DATE')}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            step.schedulingType === 'ABSOLUTE_DATE'
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4 inline mr-1.5" />
+                          Fecha Específica
+                        </button>
                       </div>
+
+                      {step.schedulingType === 'RELATIVE_DELAY' ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Días después del paso anterior</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={step.delayDays}
+                              onChange={(e) => updateStep(index, 'delayDays', parseInt(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Horas</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="23"
+                              value={step.delayHours}
+                              onChange={(e) => updateStep(index, 'delayHours', parseInt(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Fecha y hora de envío</label>
+                          <input
+                            type="datetime-local"
+                            value={step.absoluteScheduleDate || ''}
+                            onChange={(e) => updateStep(index, 'absoluteScheduleDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -6,8 +6,10 @@ const sequenceStepSchema = z.object({
   name: z.string().min(1),
   subject: z.string().min(1),
   htmlContent: z.string().min(1),
+  schedulingType: z.enum(['RELATIVE_DELAY', 'ABSOLUTE_DATE']).default('RELATIVE_DELAY'),
   delayDays: z.number().min(0).default(0),
   delayHours: z.number().min(0).default(0),
+  absoluteScheduleDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
 });
 
 const sequenceSchema = z.object({
@@ -148,8 +150,10 @@ export const createSequence = async (req: Request, res: Response) => {
             name: step.name,
             subject: step.subject,
             htmlContent: step.htmlContent,
+            schedulingType: step.schedulingType,
             delayDays: step.delayDays,
             delayHours: step.delayHours,
+            absoluteScheduleDate: step.absoluteScheduleDate,
           })),
         },
       },
@@ -272,8 +276,10 @@ export const updateSequenceSteps = async (req: Request, res: Response) => {
           name: step.name,
           subject: step.subject,
           htmlContent: step.htmlContent,
+          schedulingType: step.schedulingType,
           delayDays: step.delayDays,
           delayHours: step.delayHours,
+          absoluteScheduleDate: step.absoluteScheduleDate,
         })),
       }),
     ]);
@@ -351,8 +357,16 @@ export const enrollContacts = async (req: Request, res: Response) => {
         const now = new Date();
         await Promise.all(
           sequence.steps.map(async (step) => {
-            const delayMs = (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
-            const scheduledFor = new Date(now.getTime() + delayMs);
+            let scheduledFor: Date;
+
+            if (step.schedulingType === 'ABSOLUTE_DATE' && step.absoluteScheduleDate) {
+              // Use absolute date directly
+              scheduledFor = step.absoluteScheduleDate;
+            } else {
+              // Calculate relative delay
+              const delayMs = (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
+              scheduledFor = new Date(now.getTime() + delayMs);
+            }
 
             return prisma.sequenceStepExecution.create({
               data: {
@@ -465,5 +479,168 @@ export const getEnrollments = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Get enrollments error:', error);
     return res.status(500).json({ error: 'Failed to get enrollments' });
+  }
+};
+
+export const getSequenceAnalytics = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const sequence = await prisma.sequence.findUnique({
+      where: { id },
+      include: {
+        steps: {
+          orderBy: { stepOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!sequence) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    // Get all executions for this sequence
+    const executions = await prisma.sequenceStepExecution.findMany({
+      where: {
+        step: {
+          sequenceId: id,
+        },
+      },
+      include: {
+        step: true,
+        enrollment: {
+          include: {
+            contact: true,
+          },
+        },
+      },
+    });
+
+    // Get all events for this sequence
+    const events = await prisma.event.findMany({
+      where: {
+        sequenceId: id,
+      },
+      include: {
+        contact: true,
+      },
+    });
+
+    // Calculate metrics
+    const totalExecutions = executions.length;
+    const sentExecutions = executions.filter((e) => e.status === 'SENT');
+    const totalSent = sentExecutions.length;
+
+    const emailOpenedEvents = events.filter((e) => e.type === 'EMAIL_OPENED');
+    const linkClickedEvents = events.filter((e) => e.type === 'LINK_CLICKED');
+
+    const uniqueOpens = new Set(emailOpenedEvents.map((e) => e.contactId)).size;
+    const uniqueClicks = new Set(linkClickedEvents.map((e) => e.contactId)).size;
+
+    const openRate = totalSent > 0 ? (uniqueOpens / totalSent) * 100 : 0;
+    const clickRate = totalSent > 0 ? (uniqueClicks / totalSent) * 100 : 0;
+
+    // Metrics by step
+    const stepMetrics = sequence.steps.map((step) => {
+      const stepExecutions = executions.filter((e) => e.stepId === step.id);
+      const stepSent = stepExecutions.filter((e) => e.status === 'SENT').length;
+      const stepEvents = events.filter((e) => e.sequenceStepExecutionId && stepExecutions.some((ex) => ex.id === e.sequenceStepExecutionId));
+      const stepOpens = stepEvents.filter((e) => e.type === 'EMAIL_OPENED').length;
+      const stepClicks = stepEvents.filter((e) => e.type === 'LINK_CLICKED').length;
+
+      return {
+        stepId: step.id,
+        stepOrder: step.stepOrder,
+        name: step.name,
+        subject: step.subject,
+        sent: stepSent,
+        opened: stepOpens,
+        clicked: stepClicks,
+        openRate: stepSent > 0 ? (stepOpens / stepSent) * 100 : 0,
+        clickRate: stepSent > 0 ? (stepClicks / stepSent) * 100 : 0,
+      };
+    });
+
+    // Device stats
+    const deviceStats: Record<string, number> = {};
+    events.forEach((event) => {
+      if (event.device) {
+        deviceStats[event.device] = (deviceStats[event.device] || 0) + 1;
+      }
+    });
+
+    // Country stats
+    const countryStats: Record<string, number> = {};
+    events.forEach((event) => {
+      if (event.country) {
+        countryStats[event.country] = (countryStats[event.country] || 0) + 1;
+      }
+    });
+
+    // Engagement timeline (grouped by date)
+    const timelineMap: Record<string, { opens: number; clicks: number }> = {};
+    events.forEach((event) => {
+      const date = event.createdAt.toISOString().split('T')[0];
+      if (!timelineMap[date]) {
+        timelineMap[date] = { opens: 0, clicks: 0 };
+      }
+      if (event.type === 'EMAIL_OPENED') {
+        timelineMap[date].opens++;
+      } else if (event.type === 'LINK_CLICKED') {
+        timelineMap[date].clicks++;
+      }
+    });
+
+    const engagementTimeline = Object.entries(timelineMap)
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Count enrollments
+    const enrollments = await prisma.sequenceEnrollment.count({
+      where: { sequenceId: id },
+    });
+
+    const activeEnrollments = await prisma.sequenceEnrollment.count({
+      where: {
+        sequenceId: id,
+        status: 'ACTIVE',
+      },
+    });
+
+    const completedEnrollments = await prisma.sequenceEnrollment.count({
+      where: {
+        sequenceId: id,
+        completedAt: { not: null },
+      },
+    });
+
+    return res.json({
+      sequence: {
+        id: sequence.id,
+        name: sequence.name,
+        status: sequence.status,
+      },
+      metrics: {
+        enrollments,
+        activeEnrollments,
+        completedEnrollments,
+        totalExecutions,
+        sent: totalSent,
+        opened: uniqueOpens,
+        clicked: uniqueClicks,
+        openRate: Math.round(openRate * 100) / 100,
+        clickRate: Math.round(clickRate * 100) / 100,
+      },
+      stepMetrics,
+      deviceStats: Object.entries(deviceStats).map(([device, count]) => ({ device, count })),
+      countryStats: Object.entries(countryStats)
+        .map(([country, count]) => ({ country, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10), // Top 10 countries
+      engagementTimeline,
+    });
+  } catch (error) {
+    console.error('Get sequence analytics error:', error);
+    return res.status(500).json({ error: 'Failed to get sequence analytics' });
   }
 };

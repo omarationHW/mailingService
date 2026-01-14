@@ -8,9 +8,9 @@ import EmailEditor from '../components/EmailEditor';
 import { allTemplates, EmailTemplate } from '../data/emailTemplates';
 
 export default function NewCampaign() {
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [, setContacts] = useState<any[]>([]);
+  const [, setTemplates] = useState<any[]>([]);
+  const [selectedContacts] = useState<string[]>([]);
   const [tags, setTags] = useState<string>('');
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [subject, setSubject] = useState<string>('');

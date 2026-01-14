@@ -2,14 +2,11 @@ import { useEffect, useState } from 'react';
 import { analyticsApi } from '../api/analytics';
 import { DashboardAnalytics } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Mail, Users, MousePointerClick, TrendingUp, BarChart3, Eye } from 'lucide-react';
+import { Mail, Users, MousePointerClick, BarChart3, Eye } from 'lucide-react';
 import { format } from 'date-fns';
-import { useAuthStore } from '../store/authStore';
-
 export default function Dashboard() {
   const [data, setData] = useState<DashboardAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuthStore();
 
   useEffect(() => {
     loadData();

@@ -72,7 +72,7 @@ ${html}
   }
 
   async sendEmail(params: {
-    campaignId: string;
+    campaignId?: string;
     contactId: string;
     trackToken: string;
     to: string;
@@ -80,6 +80,8 @@ ${html}
     subject: string;
     html: string;
     variables?: Record<string, any>;
+    sequenceId?: string;
+    sequenceStepExecutionId?: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       console.log(`📧 Sending email to ${params.to}...`);
@@ -113,6 +115,8 @@ ${html}
           type: EventType.EMAIL_SENT,
           campaignId: params.campaignId,
           contactId: params.contactId,
+          sequenceId: params.sequenceId,
+          sequenceStepExecutionId: params.sequenceStepExecutionId,
           metadata: {
             messageId: result.data?.id,
           },
@@ -133,6 +137,8 @@ ${html}
           type: EventType.EMAIL_FAILED,
           campaignId: params.campaignId,
           contactId: params.contactId,
+          sequenceId: params.sequenceId,
+          sequenceStepExecutionId: params.sequenceStepExecutionId,
           metadata: {
             error: error instanceof Error ? error.message : 'Unknown error',
             to: params.to,

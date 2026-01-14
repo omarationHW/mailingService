@@ -15,6 +15,7 @@ import ContactListDetail from './pages/ContactListDetail';
 import Templates from './pages/Templates';
 import Sequences from './pages/Sequences';
 import NewSequence from './pages/NewSequence';
+import SequenceDetail from './pages/SequenceDetail';
 
 export default function App() {
   const { checkAuth } = useAuthStore();
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="sequences" element={<Sequences />} />
         <Route path="sequences/new" element={<NewSequence />} />
+        <Route path="sequences/:id" element={<SequenceDetail />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contact-lists" element={<ContactLists />} />
         <Route path="contact-lists/:id" element={<ContactListDetail />} />

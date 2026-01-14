@@ -9,6 +9,7 @@ import {
   enrollContacts,
   unenrollContact,
   getEnrollments,
+  getSequenceAnalytics,
 } from '../controllers/sequenceController';
 import { authenticate } from '../middleware/auth';
 
@@ -31,5 +32,8 @@ router.put('/:id/steps', updateSequenceSteps);
 router.post('/:id/enroll', enrollContacts);
 router.delete('/:id/contacts/:contactId', unenrollContact);
 router.get('/:id/enrollments', getEnrollments);
+
+// Analytics
+router.get('/:id/analytics', getSequenceAnalytics);
 
 export default router;

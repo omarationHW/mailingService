@@ -3,6 +3,7 @@ import api from './client';
 export type SequenceStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
 export type SequenceTriggerType = 'MANUAL' | 'CONTACT_CREATED' | 'LIST_ADDED' | 'TAG_ADDED' | 'EMAIL_OPENED' | 'LINK_CLICKED';
 export type SequenceStepStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+export type SchedulingType = 'RELATIVE_DELAY' | 'ABSOLUTE_DATE';
 
 export interface SequenceStep {
   id: string;
@@ -11,8 +12,10 @@ export interface SequenceStep {
   name: string;
   subject: string;
   htmlContent: string;
+  schedulingType: SchedulingType;
   delayDays: number;
   delayHours: number;
+  absoluteScheduleDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,8 +76,10 @@ export interface CreateSequenceStep {
   name: string;
   subject: string;
   htmlContent: string;
+  schedulingType?: SchedulingType;
   delayDays?: number;
   delayHours?: number;
+  absoluteScheduleDate?: string;
 }
 
 export interface CreateSequenceData {
@@ -149,6 +154,11 @@ export const sequencesApi = {
     const response = await api.get(`/sequences/${sequenceId}/enrollments`, {
       params,
     });
+    return response.data;
+  },
+
+  getAnalytics: async (sequenceId: string) => {
+    const response = await api.get(`/sequences/${sequenceId}/analytics`);
     return response.data;
   },
 };
