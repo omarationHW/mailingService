@@ -81,7 +81,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-orange-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-green-600 flex items-center justify-center">
               <Send className="text-white" size={18} />
             </div>
             <div>
