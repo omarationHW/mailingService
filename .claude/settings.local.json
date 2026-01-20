@@ -4,7 +4,11 @@
       "Bash(npm run dev:*)",
       "Bash(npx prisma migrate:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(dir:*)",
+      "Bash(docker exec:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
