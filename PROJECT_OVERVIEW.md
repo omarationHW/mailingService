@@ -38,8 +38,8 @@ mailingService/
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── docker-compose.yml       (PostgreSQL local)
-├── DATABASE_SETUP.md
+├── PROJECT_OVERVIEW.md      (Este archivo - documentación técnica)
+├── SETUP.md                 (Guía de instalación y ejecución)
 └── README.md
 ```
 
@@ -52,7 +52,7 @@ mailingService/
 |------------|-----|
 | Node.js + Express.js | Servidor HTTP |
 | TypeScript | Tipado estático |
-| PostgreSQL | Base de datos relacional |
+| Neon (PostgreSQL) | Base de datos en la nube |
 | Prisma ORM | Gestión de BD y migraciones |
 | Resend API | Servicio de envío de emails |
 | JWT | Autenticación stateless |
@@ -246,15 +246,22 @@ npm run lint         # ESLint
 
 ## Configuración de Deployment
 
+### Base de Datos (Neon)
+- PostgreSQL serverless en la nube
+- Connection string con `?sslmode=require`
+- Dashboard: [neon.tech](https://neon.tech)
+
 ### Backend (Render)
 - Trust proxy configurado
-- Variables de entorno necesarias en `.env`
-- PostgreSQL como servicio externo
+- Variables de entorno en el dashboard de Render
+- Build command: `npm install && npm run build`
+- Start command: `npm start`
 
 ### Frontend (Vercel)
 - `vercel.json` configurado para SPA routing
 - Build command: `npm run build`
 - Output directory: `dist`
+- Variable de entorno: `VITE_API_URL`
 
 ---
 
@@ -262,12 +269,20 @@ npm run lint         # ESLint
 
 ### Backend (.env)
 ```env
-DATABASE_URL=postgresql://...
-JWT_SECRET=...
-RESEND_API_KEY=...
-FRONTEND_URL=...
+DATABASE_URL=postgresql://usuario:password@host/database?sslmode=require
+JWT_SECRET=tu_secreto_jwt_seguro
+RESEND_API_KEY=re_xxxxxxxxxx
+FRONTEND_URL=http://localhost:5173
 PORT=3000
 ```
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Connection string de Neon (PostgreSQL en la nube) |
+| `JWT_SECRET` | Clave secreta para firmar tokens JWT |
+| `RESEND_API_KEY` | API key de Resend para envío de emails |
+| `FRONTEND_URL` | URL del frontend (para configuración de CORS) |
+| `PORT` | Puerto del servidor (default: 3000) |
 
 ---
 
@@ -294,3 +309,7 @@ PORT=3000
 ---
 
 *Última actualización: Enero 2026*
+
+---
+
+> **Nota:** Para instrucciones detalladas de instalación y ejecución, consulta [SETUP.md](./SETUP.md)
