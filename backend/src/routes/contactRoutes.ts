@@ -8,6 +8,7 @@ import {
   deleteContact,
   importContacts,
   exportContacts,
+  downloadTemplate,
 } from '../controllers/contactController';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -18,10 +19,11 @@ router.use(authenticate);
 
 router.get('/', getContacts);
 router.get('/export', exportContacts);
+router.get('/template', downloadTemplate);
+router.post('/import', authorize('ADMIN', 'EDITOR'), upload.single('file'), importContacts);
 router.get('/:id', getContact);
 router.post('/', authorize('ADMIN', 'EDITOR'), createContact);
 router.put('/:id', authorize('ADMIN', 'EDITOR'), updateContact);
 router.delete('/:id', authorize('ADMIN', 'EDITOR'), deleteContact);
-router.post('/import', authorize('ADMIN', 'EDITOR'), upload.single('file'), importContacts);
 
 export default router;

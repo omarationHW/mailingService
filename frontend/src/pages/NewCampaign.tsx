@@ -1,44 +1,97 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { campaignsApi } from '../api/campaigns';
-import { contactsApi } from '../api/contacts';
 import { templatesApi } from '../api/templates';
+import { Template } from '../types';
 import toast from 'react-hot-toast';
 import EmailEditor from '../components/EmailEditor';
 import { allTemplates, EmailTemplate } from '../data/emailTemplates';
+import { Users, ArrowLeft, FileText } from 'lucide-react';
+
+interface FormState {
+  name: string;
+  subject: string;
+  preheader: string;
+  fromEmail: string;
+  fromName: string;
+  tags: string;
+  htmlContent: string;
+}
+
+const EMPTY_FORM: FormState = {
+  name: '', subject: '', preheader: '', fromEmail: '', fromName: '', tags: '', htmlContent: '',
+};
 
 export default function NewCampaign() {
-  const [, setContacts] = useState<any[]>([]);
-  const [, setTemplates] = useState<any[]>([]);
-  const [selectedContacts] = useState<string[]>([]);
-  const [tags, setTags] = useState<string>('');
-  const [htmlContent, setHtmlContent] = useState<string>('');
-  const [subject, setSubject] = useState<string>('');
-  const [preheader, setPreheader] = useState<string>('');
-  const [showTemplates, setShowTemplates] = useState<boolean>(true);
+  const { id } = useParams<{ id?: string }>();
+  const isEditing = Boolean(id);
   const navigate = useNavigate();
 
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [showTemplates, setShowTemplates] = useState(!isEditing);
+  const [savedTemplates, setSavedTemplates] = useState<Template[]>([]);
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [recipientLoading, setRecipientLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Load existing campaign when editing
   useEffect(() => {
-    loadData();
+    if (!isEditing || !id) return;
+    campaignsApi.getOne(id).then(({ campaign }) => {
+      setForm({
+        name: campaign.name,
+        subject: campaign.subject,
+        preheader: campaign.preheader ?? '',
+        fromEmail: campaign.fromEmail,
+        fromName: campaign.fromName,
+        tags: (campaign as any).tags?.join(', ') ?? '',
+        htmlContent: campaign.htmlContent,
+      });
+    }).catch(() => {
+      toast.error('Error al cargar la campaña');
+      navigate('/campaigns');
+    });
+  }, [id, isEditing, navigate]);
+
+  // Load saved templates for the picker
+  useEffect(() => {
+    if (isEditing) return;
+    templatesApi.getAll({ limit: 100 }).then(data => {
+      setSavedTemplates(data.templates);
+    }).catch(() => {});
+  }, [isEditing]);
+
+  // Debounced preview of recipient count
+  const fetchRecipientCount = useCallback(async (tags: string) => {
+    setRecipientLoading(true);
+    try {
+      const { count } = await campaignsApi.previewRecipients(tags || undefined);
+      setRecipientCount(count);
+    } catch {
+      setRecipientCount(null);
+    } finally {
+      setRecipientLoading(false);
+    }
   }, []);
 
-  const loadData = async () => {
-    try {
-      const [contactsData, templatesData] = await Promise.all([
-        contactsApi.getAll({ limit: 1000 }),
-        templatesApi.getAll({ limit: 100 }),
-      ]);
-      setContacts(contactsData.contacts);
-      setTemplates(templatesData.templates);
-    } catch (error) {
-      toast.error('Failed to load data');
-    }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchRecipientCount(form.tags);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [form.tags, fetchRecipientCount]);
+
+  const setField = (field: keyof FormState) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+
+  const handleSavedTemplateSelect = (template: Template) => {
+    setForm(prev => ({ ...prev, htmlContent: template.htmlContent }));
+    setShowTemplates(false);
+    toast.success(`Plantilla "${template.name}" cargada`);
   };
 
   const handleTemplateSelect = (template: EmailTemplate) => {
-    setSubject(template.subject);
-    setPreheader(template.preheader);
-    // Convert template content to HTML
     const paragraphs = template.content.split('\n\n');
     let html = '';
     for (const para of paragraphs) {
@@ -46,8 +99,7 @@ export default function NewCampaign() {
       if (!trimmed) continue;
       html += `<p style="margin: 16px 0; font-size: 16px; line-height: 1.6;">${trimmed}</p>\n`;
     }
-    const fullHtml = `
-<!DOCTYPE html>
+    const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -69,183 +121,278 @@ export default function NewCampaign() {
   </table>
 </body>
 </html>`.trim();
-    setHtmlContent(fullHtml);
+
+    setForm(prev => ({ ...prev, subject: template.subject, preheader: template.preheader, htmlContent: fullHtml }));
     setShowTemplates(false);
     toast.success(`Plantilla "${template.name}" cargada`);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
 
-    const data = {
-      name: formData.get('name') as string,
-      subject: subject,
-      preheader: preheader || undefined,
-      htmlContent: htmlContent,
-      fromEmail: formData.get('fromEmail') as string,
-      fromName: formData.get('fromName') as string,
-      contactIds: selectedContacts.length > 0 ? selectedContacts : undefined,
-      tags: tags ? tags.split(',').map(t => t.trim()) : undefined,
+    if (!form.htmlContent.trim()) {
+      toast.error('El contenido del email no puede estar vacío');
+      return;
+    }
+
+    setSubmitting(true);
+    const payload = {
+      name: form.name,
+      subject: form.subject,
+      preheader: form.preheader || undefined,
+      htmlContent: form.htmlContent,
+      fromEmail: form.fromEmail,
+      fromName: form.fromName,
+      tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
     };
 
     try {
-      await campaignsApi.create(data);
-      toast.success('Campaign created successfully');
+      if (isEditing && id) {
+        await campaignsApi.update(id, payload);
+        toast.success('Campaña actualizada correctamente');
+      } else {
+        await campaignsApi.create(payload);
+        toast.success('Campaña creada correctamente');
+      }
       navigate('/campaigns');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to create campaign');
+      toast.error(error.response?.data?.error || 'Error al guardar la campaña');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Crear Campaña</h1>
-        <p className="text-gray-600 text-sm">Crea y programa campañas de email marketing</p>
-      </div>
+    <div className="p-8">
+      <div className="max-w-4xl mx-auto">
 
-      {showTemplates && (
-        <div className="bg-white rounded-xl shadow-card border border-gray-200 p-6 mb-6">
-          <div className="flex justify-between items-center mb-5">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Plantillas Disponibles</h2>
-              <p className="text-sm text-gray-500 mt-0.5">Comienza con una plantilla prediseñada</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowTemplates(false)}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-            >
-              Crear desde cero →
-            </button>
-          </div>
+        {/* Back link */}
+        <button
+          onClick={() => navigate('/campaigns')}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors group"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+          Volver a campañas
+        </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allTemplates.map((template) => (
-              <div
-                key={template.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-primary-400 hover:shadow-md cursor-pointer transition-all group"
-                onClick={() => handleTemplateSelect(template)}
-              >
-                <div className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded inline-block mb-2">{template.category}</div>
-                <h3 className="font-semibold text-sm text-gray-900 mb-1.5 group-hover:text-primary-600 transition">{template.name}</h3>
-                <p className="text-xs text-gray-600 mb-1.5 line-clamp-1">{template.subject}</p>
-                <p className="text-xs text-gray-500 italic line-clamp-2">{template.preheader}</p>
+        {/* Template picker */}
+        {showTemplates && !isEditing && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Elige una plantilla</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Comienza con una plantilla prediseñada o una guardada</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={() => setShowTemplates(false)}
+                className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+              >
+                Crear desde cero →
+              </button>
+            </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-card border border-gray-200 p-6 space-y-6">
-        {!showTemplates && (
-          <button
-            type="button"
-            onClick={() => setShowTemplates(true)}
-            className="text-sm text-blue-600 hover:text-blue-800 mb-4"
-          >
-            ← Ver plantillas
-          </button>
+            {/* Saved templates from DB */}
+            {savedTemplates.length > 0 && (
+              <>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Tus plantillas</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  {savedTemplates.map((template) => (
+                    <div
+                      key={template.id}
+                      onClick={() => handleSavedTemplateSelect(template)}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-orange-400 hover:shadow-md cursor-pointer transition-all group"
+                    >
+                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mb-2">
+                        <FileText size={15} className="text-orange-600" />
+                      </div>
+                      <h3 className="font-semibold text-sm text-gray-900 mb-1 group-hover:text-orange-600 transition-colors truncate">
+                        {template.name}
+                      </h3>
+                      {template.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2">{template.description}</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1.5 font-mono">
+                        {template.htmlContent.length.toLocaleString()} car. HTML
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Built-in example templates */}
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Plantillas de ejemplo</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  onClick={() => handleTemplateSelect(template)}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-orange-400 hover:shadow-md cursor-pointer transition-all group"
+                >
+                  <div className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded inline-block mb-2">
+                    {template.category}
+                  </div>
+                  <h3 className="font-semibold text-sm text-gray-900 mb-1.5 group-hover:text-orange-600 transition-colors">
+                    {template.name}
+                  </h3>
+                  <p className="text-xs text-gray-600 mb-1.5 line-clamp-1">{template.subject}</p>
+                  <p className="text-xs text-gray-500 italic line-clamp-2">{template.preheader}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre de la Campaña *</label>
-          <input
-            name="name"
-            type="text"
-            required
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-            placeholder="Ej: Campaña Nómina Mayo 2025"
-          />
-        </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+          {!showTemplates && !isEditing && (
+            <button
+              type="button"
+              onClick={() => setShowTemplates(true)}
+              className="text-sm text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
+            >
+              ← Ver plantillas
+            </button>
+          )}
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Asunto del Email *</label>
-          <input
-            name="subject"
-            type="text"
-            required
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-            placeholder="Ej: Seguridad privada para tu nómina 💼"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Preheader (texto de vista previa)</label>
-          <input
-            name="preheader"
-            type="text"
-            value={preheader}
-            onChange={(e) => setPreheader(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-            placeholder="Ej: Automatiza pagos y contratos sin errores."
-          />
-          <p className="text-xs text-gray-500 mt-1.5">Texto que aparece junto al asunto en la bandeja de entrada</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Email del Remitente *</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Nombre de la campaña <span className="text-red-500">*</span>
+            </label>
             <input
-              name="fromEmail"
-              type="email"
-              required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-              placeholder="contacto@tuempresa.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre del Remitente *</label>
-            <input
-              name="fromName"
               type="text"
               required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-              placeholder="Tu Empresa"
+              value={form.name}
+              onChange={setField('name')}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+              placeholder="Ej: Campaña Nómina Mayo 2025"
             />
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Contenido del Email *</label>
-          <EmailEditor
-            value={htmlContent}
-            onChange={setHtmlContent}
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Asunto del email <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={form.subject}
+              onChange={setField('subject')}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+              placeholder="Ej: Seguridad privada para tu nómina 💼"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Destinatarios (filtrar por tags)</label>
-          <input
-            type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="vip,newsletter,clientes"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-          />
-          <p className="text-xs text-gray-500 mt-1.5">Separados por comas. Dejar vacío para enviar a todos los contactos.</p>
-        </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Preheader <span className="text-gray-400 font-normal">(texto de vista previa)</span>
+            </label>
+            <input
+              type="text"
+              value={form.preheader}
+              onChange={setField('preheader')}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+              placeholder="Ej: Automatiza pagos y contratos sin errores."
+            />
+            <p className="text-xs text-gray-500 mt-1.5">
+              Texto que aparece junto al asunto en la bandeja de entrada del destinatario.
+            </p>
+          </div>
 
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            type="submit"
-            className="bg-primary-600 text-white px-6 py-2.5 rounded-lg hover:bg-primary-700 font-medium transition shadow-sm hover:shadow-md"
-          >
-            Crear Campaña
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/campaigns')}
-            className="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-50 font-medium transition"
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Email del remitente <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                value={form.fromEmail}
+                onChange={setField('fromEmail')}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+                placeholder="contacto@tuempresa.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nombre del remitente <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={form.fromName}
+                onChange={setField('fromName')}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+                placeholder="Tu Empresa"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Contenido del email <span className="text-red-500">*</span>
+            </label>
+            <EmailEditor value={form.htmlContent} onChange={html => setForm(prev => ({ ...prev, htmlContent: html }))} />
+            {!form.htmlContent.trim() && (
+              <p className="text-xs text-red-500 mt-1.5">El contenido del email es obligatorio.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Destinatarios <span className="text-gray-400 font-normal">(filtrar por tags)</span>
+            </label>
+            <input
+              type="text"
+              value={form.tags}
+              onChange={setField('tags')}
+              placeholder="vip, newsletter, clientes"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition text-sm"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <Users size={14} className="text-gray-400" />
+              {recipientLoading ? (
+                <span className="text-xs text-gray-400">Calculando destinatarios...</span>
+              ) : recipientCount !== null ? (
+                <span className="text-xs text-gray-600">
+                  <span className="font-semibold text-orange-600">{recipientCount}</span>{' '}
+                  {recipientCount === 1 ? 'contacto coincide' : 'contactos coinciden'} con estos tags
+                  {!form.tags.trim() && ' (se enviaría a todos los contactos)'}
+                </span>
+              ) : null}
+            </div>
+            {isEditing ? (
+              <p className="text-xs text-gray-400 mt-1">
+                Los destinatarios originales ya están asignados. Dejar vacío para mantenerlos sin cambios.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">
+                Separados por comas. Dejar vacío para enviar a todos los contactos.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors"
+            >
+              {submitting
+                ? isEditing ? 'Guardando...' : 'Creando...'
+                : isEditing ? 'Guardar cambios' : 'Crear campaña'}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/campaigns')}
+              className="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

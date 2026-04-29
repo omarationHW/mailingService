@@ -7,6 +7,8 @@ import {
   deleteSequence,
   updateSequenceSteps,
   enrollContacts,
+  enrollByTags,
+  previewEnrollByTags,
   unenrollContact,
   getEnrollments,
   getSequenceAnalytics,
@@ -30,6 +32,8 @@ router.put('/:id/steps', updateSequenceSteps);
 
 // Manage enrollments
 router.post('/:id/enroll', enrollContacts);
+router.get('/:id/enroll-by-tags/preview', previewEnrollByTags);
+router.post('/:id/enroll-by-tags', enrollByTags);
 router.delete('/:id/contacts/:contactId', unenrollContact);
 router.get('/:id/enrollments', getEnrollments);
 

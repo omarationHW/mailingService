@@ -398,6 +398,99 @@ export const enrollContacts = async (req: Request, res: Response) => {
   }
 };
 
+export const previewEnrollByTags = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.query;
+
+    const sequence = await prisma.sequence.findUnique({ where: { id } });
+    if (!sequence) return res.status(404).json({ error: 'Sequence not found' });
+
+    let contacts;
+    if (tags && typeof tags === 'string' && tags.trim()) {
+      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      contacts = await prisma.contact.findMany({
+        where: { tags: { hasSome: tagList } },
+        select: { id: true, email: true, name: true },
+      });
+    } else {
+      contacts = await prisma.contact.findMany({
+        select: { id: true, email: true, name: true },
+      });
+    }
+
+    // Exclude already enrolled
+    const alreadyEnrolled = await prisma.sequenceEnrollment.findMany({
+      where: { sequenceId: id, contactId: { in: contacts.map((c) => c.id) } },
+      select: { contactId: true },
+    });
+    const enrolledIds = new Set(alreadyEnrolled.map((e) => e.contactId));
+    const eligible = contacts.filter((c) => !enrolledIds.has(c.id));
+
+    return res.json({ count: eligible.length, contacts: eligible.slice(0, 5) });
+  } catch (error) {
+    console.error('Preview enroll by tags error:', error);
+    return res.status(500).json({ error: 'Failed to preview enrollment' });
+  }
+};
+
+export const enrollByTags = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body as { tags?: string };
+
+    const sequence = await prisma.sequence.findUnique({
+      where: { id },
+      include: { steps: { orderBy: { stepOrder: 'asc' } } },
+    });
+    if (!sequence) return res.status(404).json({ error: 'Sequence not found' });
+    if (sequence.status !== 'ACTIVE') {
+      return res.status(400).json({ error: 'Cannot enroll contacts in inactive sequence' });
+    }
+
+    let contacts;
+    if (tags && tags.trim()) {
+      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      contacts = await prisma.contact.findMany({ where: { tags: { hasSome: tagList } } });
+    } else {
+      contacts = await prisma.contact.findMany();
+    }
+
+    const alreadyEnrolled = await prisma.sequenceEnrollment.findMany({
+      where: { sequenceId: id, contactId: { in: contacts.map((c) => c.id) } },
+      select: { contactId: true },
+    });
+    const enrolledIds = new Set(alreadyEnrolled.map((e) => e.contactId));
+    const eligible = contacts.filter((c) => !enrolledIds.has(c.id));
+
+    const now = new Date();
+    let enrolled = 0;
+
+    for (const contact of eligible) {
+      const enrollment = await prisma.sequenceEnrollment.create({
+        data: { sequenceId: id, contactId: contact.id, status: 'ACTIVE' },
+      });
+      await Promise.all(
+        sequence.steps.map((step) => {
+          const delayMs = (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
+          const scheduledFor = step.schedulingType === 'ABSOLUTE_DATE' && step.absoluteScheduleDate
+            ? step.absoluteScheduleDate
+            : new Date(now.getTime() + delayMs);
+          return prisma.sequenceStepExecution.create({
+            data: { enrollmentId: enrollment.id, stepId: step.id, status: 'PENDING', scheduledFor },
+          });
+        })
+      );
+      enrolled++;
+    }
+
+    return res.json({ message: `${enrolled} contactos inscritos`, enrolled });
+  } catch (error) {
+    console.error('Enroll by tags error:', error);
+    return res.status(500).json({ error: 'Failed to enroll contacts by tags' });
+  }
+};
+
 export const unenrollContact = async (req: Request, res: Response) => {
   try {
     const { id, contactId } = req.params;

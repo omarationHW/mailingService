@@ -36,8 +36,19 @@ export const contactsApi = {
     return response.data;
   },
 
-  export: async () => {
-    const response = await api.get('/contacts/export', { responseType: 'blob' });
-    return response.data;
+  export: async (format: 'csv' | 'xlsx' = 'csv') => {
+    const response = await api.get('/contacts/export', {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  },
+
+  downloadTemplate: async (format: 'csv' | 'xlsx' = 'xlsx') => {
+    const response = await api.get('/contacts/template', {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data as Blob;
   },
 };

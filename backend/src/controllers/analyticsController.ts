@@ -4,25 +4,60 @@ import { EventType } from '@prisma/client';
 
 export const getDashboardAnalytics = async (_req: Request, res: Response) => {
   try {
+    // Date boundaries for current and previous month
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
     const [
       totalCampaigns,
+      prevMonthCampaigns,
       totalContacts,
+      prevMonthContacts,
       totalSent,
+      prevMonthSent,
       totalOpens,
+      prevMonthOpens,
       totalClicks,
+      prevMonthClicks,
       recentCampaigns,
       topContacts,
     ] = await Promise.all([
-      prisma.campaign.count(),
+      // Current totals
+      prisma.campaign.count({
+        where: { status: { in: ['COMPLETED', 'SENDING'] } },
+      }),
+      prisma.campaign.count({
+        where: {
+          status: { in: ['COMPLETED', 'SENDING'] },
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
+      }),
       prisma.contact.count(),
-      prisma.event.count({
-        where: { type: EventType.EMAIL_SENT },
+      prisma.contact.count({
+        where: { createdAt: { gte: prevMonthStart, lte: prevMonthEnd } },
       }),
+      prisma.event.count({ where: { type: EventType.EMAIL_SENT } }),
       prisma.event.count({
-        where: { type: EventType.EMAIL_OPENED },
+        where: {
+          type: EventType.EMAIL_SENT,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
       }),
+      prisma.event.count({ where: { type: EventType.EMAIL_OPENED } }),
       prisma.event.count({
-        where: { type: EventType.LINK_CLICKED },
+        where: {
+          type: EventType.EMAIL_OPENED,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
+      }),
+      prisma.event.count({ where: { type: EventType.LINK_CLICKED } }),
+      prisma.event.count({
+        where: {
+          type: EventType.LINK_CLICKED,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
       }),
       prisma.campaign.findMany({
         take: 5,
@@ -58,6 +93,33 @@ export const getDashboardAnalytics = async (_req: Request, res: Response) => {
       `,
     ]);
 
+    // Current month counts for rate comparison
+    const currentMonthSent = await prisma.event.count({
+      where: { type: EventType.EMAIL_SENT, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthOpens = await prisma.event.count({
+      where: { type: EventType.EMAIL_OPENED, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthClicks = await prisma.event.count({
+      where: { type: EventType.LINK_CLICKED, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthCampaigns = await prisma.campaign.count({
+      where: { status: { in: ['COMPLETED', 'SENDING'] }, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthContacts = await prisma.contact.count({
+      where: { createdAt: { gte: currentMonthStart } },
+    });
+
+    const calcChange = (current: number, previous: number): number | null => {
+      if (previous === 0) return null;
+      return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+    };
+
+    const currentOpenRate = currentMonthSent > 0 ? (currentMonthOpens / currentMonthSent) * 100 : 0;
+    const prevOpenRate = prevMonthSent > 0 ? (prevMonthOpens / prevMonthSent) * 100 : 0;
+    const currentClickRate = currentMonthSent > 0 ? (currentMonthClicks / currentMonthSent) * 100 : 0;
+    const prevClickRate = prevMonthSent > 0 ? (prevMonthClicks / prevMonthSent) * 100 : 0;
+
     const openRate = totalSent > 0 ? (totalOpens / totalSent) * 100 : 0;
     const clickRate = totalSent > 0 ? (totalClicks / totalSent) * 100 : 0;
 
@@ -90,6 +152,18 @@ export const getDashboardAnalytics = async (_req: Request, res: Response) => {
         totalClicks,
         openRate: parseFloat(openRate.toFixed(2)),
         clickRate: parseFloat(clickRate.toFixed(2)),
+        changes: {
+          campaigns: calcChange(currentMonthCampaigns, prevMonthCampaigns),
+          contacts: calcChange(currentMonthContacts, prevMonthContacts),
+          openRate: calcChange(
+            parseFloat(currentOpenRate.toFixed(2)),
+            parseFloat(prevOpenRate.toFixed(2))
+          ),
+          clickRate: calcChange(
+            parseFloat(currentClickRate.toFixed(2)),
+            parseFloat(prevClickRate.toFixed(2))
+          ),
+        },
       },
       recentCampaigns: recentCampaigns.map((c) => ({
         id: c.id,

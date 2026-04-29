@@ -31,4 +31,11 @@ export const campaignsApi = {
     const response = await api.post(`/campaigns/${id}/send`);
     return response.data;
   },
+
+  previewRecipients: async (tags?: string): Promise<{ count: number }> => {
+    const response = await api.get('/campaigns/preview-recipients', {
+      params: tags ? { tags } : {},
+    });
+    return response.data;
+  },
 };

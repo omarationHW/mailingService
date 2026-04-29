@@ -69,16 +69,8 @@ export const getContactList = async (req: Request, res: Response) => {
     const list = await prisma.contactList.findUnique({
       where: { id },
       include: {
-        members: {
-          include: {
-            contact: true,
-          },
-          orderBy: { addedAt: 'desc' },
-        },
         _count: {
-          select: {
-            members: true,
-          },
+          select: { members: true },
         },
       },
     });
@@ -262,37 +254,42 @@ export const removeContactFromList = async (req: Request, res: Response) => {
 export const getContactsInList = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { page = '1', limit = '50' } = req.query;
+    const { page = '1', limit = '50', search } = req.query;
 
     const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const limitNum = Math.min(parseInt(limit as string) || 50, 500);
     const skip = (pageNum - 1) * limitNum;
 
-    const list = await prisma.contactList.findUnique({
-      where: { id },
-    });
-
+    const list = await prisma.contactList.findUnique({ where: { id } });
     if (!list) {
       return res.status(404).json({ error: 'Contact list not found' });
     }
 
+    const contactWhere: any = {};
+    if (search) {
+      contactWhere.OR = [
+        { email: { contains: search as string, mode: 'insensitive' } },
+        { name: { contains: search as string, mode: 'insensitive' } },
+        { company: { contains: search as string, mode: 'insensitive' } },
+      ];
+    }
+
+    const memberWhere: any = { contactListId: id };
+    if (search) memberWhere.contact = contactWhere;
+
     const [members, total] = await Promise.all([
       prisma.contactListMember.findMany({
-        where: { contactListId: id },
+        where: memberWhere,
         skip,
         take: limitNum,
-        include: {
-          contact: true,
-        },
+        include: { contact: true },
         orderBy: { addedAt: 'desc' },
       }),
-      prisma.contactListMember.count({ where: { contactListId: id } }),
+      prisma.contactListMember.count({ where: memberWhere }),
     ]);
 
-    const contacts = members.map((m) => m.contact);
-
     return res.json({
-      contacts,
+      members,
       pagination: {
         page: pageNum,
         limit: limitNum,

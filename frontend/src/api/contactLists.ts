@@ -22,6 +22,7 @@ export interface ContactListMember {
     name?: string;
     company?: string;
     phone?: string;
+    tags: string[];
   };
 }
 
@@ -71,7 +72,7 @@ export const contactListsApi = {
 
   getContacts: async (
     listId: string,
-    params?: { page?: number; limit?: number }
+    params?: { page?: number; limit?: number; search?: string }
   ) => {
     const response = await api.get(`/contact-lists/${listId}/contacts`, {
       params,

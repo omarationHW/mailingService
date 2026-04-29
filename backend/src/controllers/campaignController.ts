@@ -246,6 +246,28 @@ export const deleteCampaign = async (req: Request, res: Response) => {
   }
 };
 
+export const previewRecipients = async (req: Request, res: Response) => {
+  try {
+    const { tags } = req.query;
+
+    let count: number;
+
+    if (tags && typeof tags === 'string' && tags.trim()) {
+      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      count = await prisma.contact.count({
+        where: { tags: { hasSome: tagList } },
+      });
+    } else {
+      count = await prisma.contact.count();
+    }
+
+    return res.json({ count });
+  } catch (error) {
+    console.error('Preview recipients error:', error);
+    return res.status(500).json({ error: 'Failed to preview recipients' });
+  }
+};
+
 export const sendCampaign = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -268,10 +290,22 @@ export const sendCampaign = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    if (campaign.status !== CampaignStatus.DRAFT && campaign.status !== CampaignStatus.SCHEDULED) {
+    if (
+      campaign.status !== CampaignStatus.DRAFT &&
+      campaign.status !== CampaignStatus.SCHEDULED &&
+      campaign.status !== CampaignStatus.FAILED
+    ) {
       return res
         .status(400)
         .json({ error: 'Campaign has already been sent or is currently sending' });
+    }
+
+    // Reset failed contacts back to PENDING before retrying
+    if (campaign.status === CampaignStatus.FAILED) {
+      await prisma.campaignContact.updateMany({
+        where: { campaignId: id, status: CampaignContactStatus.FAILED },
+        data: { status: CampaignContactStatus.PENDING },
+      });
     }
 
     // Si la campaña no tiene contactos asociados, asociar todos los contactos automáticamente

@@ -6,6 +6,7 @@ import {
   updateCampaign,
   deleteCampaign,
   sendCampaign,
+  previewRecipients,
 } from '../controllers/campaignController';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -14,6 +15,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', getCampaigns);
+router.get('/preview-recipients', previewRecipients);
 router.get('/:id', getCampaign);
 router.post('/', authorize('ADMIN', 'EDITOR'), createCampaign);
 router.put('/:id', authorize('ADMIN', 'EDITOR'), updateCampaign);

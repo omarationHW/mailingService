@@ -11,13 +11,18 @@ export default function EmailEditor({ value, onChange }: EmailEditorProps) {
 
   // Extract plain text from HTML when value changes
   useEffect(() => {
-    if (value && value.includes('<html>')) {
-      // Extract content from HTML
+    const looksLikeHtml = value && (
+      value.includes('<!DOCTYPE') ||
+      value.includes('<html') ||
+      value.includes('<body') ||
+      value.includes('<table')
+    );
+    if (looksLikeHtml) {
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = value;
       const paragraphs = tempDiv.querySelectorAll('p');
       const textContent = Array.from(paragraphs)
-        .map(p => p.textContent)
+        .map(p => p.textContent?.trim())
         .filter(t => t && !t.includes('Variables disponibles'))
         .join('\n\n');
       setContent(textContent);
@@ -99,14 +104,14 @@ export default function EmailEditor({ value, onChange }: EmailEditorProps) {
         <button
           type="button"
           onClick={() => setMode('visual')}
-          className={`px-4 py-2 rounded ${mode === 'visual' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          className={`px-4 py-2 rounded text-sm font-medium transition-colors ${mode === 'visual' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
           Editor Visual
         </button>
         <button
           type="button"
           onClick={() => setMode('html')}
-          className={`px-4 py-2 rounded ${mode === 'html' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          className={`px-4 py-2 rounded text-sm font-medium transition-colors ${mode === 'html' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
         >
           HTML
         </button>
