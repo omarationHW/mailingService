@@ -3,8 +3,10 @@ import { z } from 'zod';
 import prisma from '../config/database';
 
 const sequenceStepSchema = z.object({
-  name: z.string().min(1),
+  _stepId: z.string().optional(), // existing step ID, used to protect already-sent steps
+  name: z.string().optional().default(''),
   subject: z.string().min(1),
+  preheader: z.string().optional(),
   htmlContent: z.string().min(1),
   schedulingType: z.enum(['RELATIVE_DELAY', 'ABSOLUTE_DATE']).default('RELATIVE_DELAY'),
   delayDays: z.number().min(0).default(0),
@@ -149,6 +151,7 @@ export const createSequence = async (req: Request, res: Response) => {
             stepOrder: index,
             name: step.name,
             subject: step.subject,
+            preheader: step.preheader,
             htmlContent: step.htmlContent,
             schedulingType: step.schedulingType,
             delayDays: step.delayDays,
@@ -264,25 +267,39 @@ export const updateSequenceSteps = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Sequence not found' });
     }
 
-    // Delete existing steps and create new ones
-    await prisma.$transaction([
-      prisma.sequenceStep.deleteMany({
-        where: { sequenceId: id },
-      }),
-      prisma.sequenceStep.createMany({
-        data: steps.map((step, index) => ({
+    // Find step IDs that already have SENT executions — protected from deletion
+    const sentExecutions = await prisma.sequenceStepExecution.findMany({
+      where: { step: { sequenceId: id }, status: 'SENT' },
+      select: { stepId: true },
+    });
+    const protectedStepIds = new Set(sentExecutions.map((e) => e.stepId));
+
+    // Delete only unprotected steps (cascade will only affect their pending executions)
+    await prisma.sequenceStep.deleteMany({
+      where: { sequenceId: id, id: { notIn: [...protectedStepIds] } },
+    });
+
+    // Create incoming steps — skip any that correspond to a protected step (they stay as-is)
+    const stepsToCreate = steps.filter((s: any) => !s._stepId || !protectedStepIds.has(s._stepId));
+
+    if (stepsToCreate.length > 0) {
+      // stepOrder: protected steps keep their original order; new steps follow after
+      const protectedCount = protectedStepIds.size;
+      await prisma.sequenceStep.createMany({
+        data: stepsToCreate.map((step: any, index) => ({
           sequenceId: id,
-          stepOrder: index,
+          stepOrder: protectedCount + index,
           name: step.name,
           subject: step.subject,
+          preheader: step.preheader,
           htmlContent: step.htmlContent,
           schedulingType: step.schedulingType,
           delayDays: step.delayDays,
           delayHours: step.delayHours,
           absoluteScheduleDate: step.absoluteScheduleDate,
         })),
-      }),
-    ]);
+      });
+    }
 
     const updatedSequence = await prisma.sequence.findUnique({
       where: { id },
@@ -353,30 +370,38 @@ export const enrollContacts = async (req: Request, res: Response) => {
           },
         });
 
-        // Create step executions for all steps
+        // Create step executions for all steps, accumulating relative delays
         const now = new Date();
+        let accumulatedMs = 0;
+        const executions: { stepId: string; scheduledFor: Date }[] = [];
+
+        for (const step of sequence.steps) {
+          let scheduledFor: Date;
+
+          if (step.schedulingType === 'ABSOLUTE_DATE' && step.absoluteScheduleDate) {
+            scheduledFor = step.absoluteScheduleDate;
+            // Reset accumulator to this absolute date for subsequent relative steps
+            accumulatedMs = step.absoluteScheduleDate.getTime() - now.getTime();
+          } else {
+            const stepDelayMs = (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
+            accumulatedMs += stepDelayMs;
+            scheduledFor = new Date(now.getTime() + accumulatedMs);
+          }
+
+          executions.push({ stepId: step.id, scheduledFor });
+        }
+
         await Promise.all(
-          sequence.steps.map(async (step) => {
-            let scheduledFor: Date;
-
-            if (step.schedulingType === 'ABSOLUTE_DATE' && step.absoluteScheduleDate) {
-              // Use absolute date directly
-              scheduledFor = step.absoluteScheduleDate;
-            } else {
-              // Calculate relative delay
-              const delayMs = (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
-              scheduledFor = new Date(now.getTime() + delayMs);
-            }
-
-            return prisma.sequenceStepExecution.create({
+          executions.map(({ stepId, scheduledFor }) =>
+            prisma.sequenceStepExecution.create({
               data: {
                 enrollmentId: enrollment.id,
-                stepId: step.id,
+                stepId,
                 status: 'PENDING',
                 scheduledFor,
               },
-            });
-          })
+            })
+          )
         );
 
         return enrollment;
@@ -395,6 +420,102 @@ export const enrollContacts = async (req: Request, res: Response) => {
     }
     console.error('Enroll contacts error:', error);
     return res.status(500).json({ error: 'Failed to enroll contacts' });
+  }
+};
+
+export const previewEnrollByTags = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.query;
+
+    const sequence = await prisma.sequence.findUnique({ where: { id } });
+    if (!sequence) return res.status(404).json({ error: 'Sequence not found' });
+
+    let contacts;
+    if (tags && typeof tags === 'string' && tags.trim()) {
+      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      contacts = await prisma.contact.findMany({
+        where: { tags: { hasSome: tagList } },
+        select: { id: true, email: true, name: true },
+      });
+    } else {
+      contacts = await prisma.contact.findMany({
+        select: { id: true, email: true, name: true },
+      });
+    }
+
+    // Exclude already enrolled
+    const alreadyEnrolled = await prisma.sequenceEnrollment.findMany({
+      where: { sequenceId: id, contactId: { in: contacts.map((c) => c.id) } },
+      select: { contactId: true },
+    });
+    const enrolledIds = new Set(alreadyEnrolled.map((e) => e.contactId));
+    const eligible = contacts.filter((c) => !enrolledIds.has(c.id));
+
+    return res.json({ count: eligible.length, contacts: eligible.slice(0, 5) });
+  } catch (error) {
+    console.error('Preview enroll by tags error:', error);
+    return res.status(500).json({ error: 'Failed to preview enrollment' });
+  }
+};
+
+export const enrollByTags = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body as { tags?: string };
+
+    const sequence = await prisma.sequence.findUnique({
+      where: { id },
+      include: { steps: { orderBy: { stepOrder: 'asc' } } },
+    });
+    if (!sequence) return res.status(404).json({ error: 'Sequence not found' });
+    if (sequence.status !== 'ACTIVE') {
+      return res.status(400).json({ error: 'Cannot enroll contacts in inactive sequence' });
+    }
+
+    let contacts;
+    if (tags && tags.trim()) {
+      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      contacts = await prisma.contact.findMany({ where: { tags: { hasSome: tagList } } });
+    } else {
+      contacts = await prisma.contact.findMany();
+    }
+
+    const alreadyEnrolled = await prisma.sequenceEnrollment.findMany({
+      where: { sequenceId: id, contactId: { in: contacts.map((c) => c.id) } },
+      select: { contactId: true },
+    });
+    const enrolledIds = new Set(alreadyEnrolled.map((e) => e.contactId));
+    const eligible = contacts.filter((c) => !enrolledIds.has(c.id));
+
+    const now = new Date();
+    let enrolled = 0;
+
+    for (const contact of eligible) {
+      const enrollment = await prisma.sequenceEnrollment.create({
+        data: { sequenceId: id, contactId: contact.id, status: 'ACTIVE' },
+      });
+      let accMs = 0;
+      for (const step of sequence.steps) {
+        let scheduledFor: Date;
+        if (step.schedulingType === 'ABSOLUTE_DATE' && step.absoluteScheduleDate) {
+          scheduledFor = step.absoluteScheduleDate;
+          accMs = step.absoluteScheduleDate.getTime() - now.getTime();
+        } else {
+          accMs += (step.delayDays * 24 * 60 * 60 * 1000) + (step.delayHours * 60 * 60 * 1000);
+          scheduledFor = new Date(now.getTime() + accMs);
+        }
+        await prisma.sequenceStepExecution.create({
+          data: { enrollmentId: enrollment.id, stepId: step.id, status: 'PENDING', scheduledFor },
+        });
+      }
+      enrolled++;
+    }
+
+    return res.json({ message: `${enrolled} contactos inscritos`, enrolled });
+  } catch (error) {
+    console.error('Enroll by tags error:', error);
+    return res.status(500).json({ error: 'Failed to enroll contacts by tags' });
   }
 };
 
@@ -531,10 +652,15 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
     const sentExecutions = executions.filter((e) => e.status === 'SENT');
     const totalSent = sentExecutions.length;
 
+    const isProxy = (e: any) => (e.metadata as any)?.viaProxy === true;
+
     const emailOpenedEvents = events.filter((e) => e.type === 'EMAIL_OPENED');
+    const realOpenEvents = emailOpenedEvents.filter((e) => !isProxy(e));
+    const proxyOpenEvents = emailOpenedEvents.filter((e) => isProxy(e));
     const linkClickedEvents = events.filter((e) => e.type === 'LINK_CLICKED');
 
-    const uniqueOpens = new Set(emailOpenedEvents.map((e) => e.contactId)).size;
+    const uniqueOpens = new Set(realOpenEvents.map((e) => e.contactId)).size;
+    const proxyOpens = new Set(proxyOpenEvents.map((e) => e.contactId)).size;
     const uniqueClicks = new Set(linkClickedEvents.map((e) => e.contactId)).size;
 
     const openRate = totalSent > 0 ? (uniqueOpens / totalSent) * 100 : 0;
@@ -545,8 +671,8 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
       const stepExecutions = executions.filter((e) => e.stepId === step.id);
       const stepSent = stepExecutions.filter((e) => e.status === 'SENT').length;
       const stepEvents = events.filter((e) => e.sequenceStepExecutionId && stepExecutions.some((ex) => ex.id === e.sequenceStepExecutionId));
-      const stepOpens = stepEvents.filter((e) => e.type === 'EMAIL_OPENED').length;
-      const stepClicks = stepEvents.filter((e) => e.type === 'LINK_CLICKED').length;
+      const stepOpens = new Set(stepEvents.filter((e) => e.type === 'EMAIL_OPENED' && !isProxy(e)).map((e) => e.contactId)).size;
+      const stepClicks = new Set(stepEvents.filter((e) => e.type === 'LINK_CLICKED').map((e) => e.contactId)).size;
 
       return {
         stepId: step.id,
@@ -561,30 +687,28 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
       };
     });
 
-    // Device stats
+    // Device stats — exclude proxy
     const deviceStats: Record<string, number> = {};
     events.forEach((event) => {
-      if (event.device) {
+      if (event.type === 'EMAIL_OPENED' && !isProxy(event) && event.device) {
         deviceStats[event.device] = (deviceStats[event.device] || 0) + 1;
       }
     });
 
-    // Country stats
+    // Country stats — exclude proxy
     const countryStats: Record<string, number> = {};
     events.forEach((event) => {
-      if (event.country) {
+      if (event.type === 'EMAIL_OPENED' && !isProxy(event) && event.country) {
         countryStats[event.country] = (countryStats[event.country] || 0) + 1;
       }
     });
 
-    // Engagement timeline (grouped by date)
+    // Engagement timeline — exclude proxy opens
     const timelineMap: Record<string, { opens: number; clicks: number }> = {};
     events.forEach((event) => {
       const date = event.createdAt.toISOString().split('T')[0];
-      if (!timelineMap[date]) {
-        timelineMap[date] = { opens: 0, clicks: 0 };
-      }
-      if (event.type === 'EMAIL_OPENED') {
+      if (!timelineMap[date]) timelineMap[date] = { opens: 0, clicks: 0 };
+      if (event.type === 'EMAIL_OPENED' && !isProxy(event)) {
         timelineMap[date].opens++;
       } else if (event.type === 'LINK_CLICKED') {
         timelineMap[date].clicks++;
@@ -594,6 +718,26 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
     const engagementTimeline = Object.entries(timelineMap)
       .map(([date, stats]) => ({ date, ...stats }))
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Opens by hour
+    const hourMap: Record<number, number> = {};
+    realOpenEvents.forEach((event) => {
+      const hour = new Date(event.createdAt).getHours();
+      hourMap[hour] = (hourMap[hour] || 0) + 1;
+    });
+    const opensByHour = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: hourMap[h] || 0 }))
+      .filter((h) => h.count > 0);
+
+    // Clicked links
+    const linkMap: Record<string, number> = {};
+    linkClickedEvents.forEach((event) => {
+      const url = (event.metadata as any)?.url;
+      if (url) linkMap[url] = (linkMap[url] || 0) + 1;
+    });
+    const clickedLinks = Object.entries(linkMap)
+      .map(([url, count]) => ({ url, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
     // Count enrollments
     const enrollments = await prisma.sequenceEnrollment.count({
@@ -627,6 +771,7 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
         totalExecutions,
         sent: totalSent,
         opened: uniqueOpens,
+        proxyOpens,
         clicked: uniqueClicks,
         openRate: Math.round(openRate * 100) / 100,
         clickRate: Math.round(clickRate * 100) / 100,
@@ -638,9 +783,60 @@ export const getSequenceAnalytics = async (req: Request, res: Response) => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 10), // Top 10 countries
       engagementTimeline,
+      opensByHour,
+      clickedLinks,
+      bounced: events.filter((e) => e.type === 'EMAIL_BOUNCED').length,
+      failed: events.filter((e) => e.type === 'EMAIL_FAILED').length,
     });
   } catch (error) {
     console.error('Get sequence analytics error:', error);
     return res.status(500).json({ error: 'Failed to get sequence analytics' });
+  }
+};
+
+export const exportSequenceReport = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const sequence = await prisma.sequence.findUnique({ where: { id } });
+    if (!sequence) return res.status(404).json({ error: 'Sequence not found' });
+
+    const enrollments = await prisma.sequenceEnrollment.findMany({
+      where: { sequenceId: id },
+      include: {
+        contact: true,
+        executions: {
+          include: { step: true },
+        },
+      },
+    });
+
+    const events = await prisma.event.findMany({ where: { sequenceId: id } });
+
+    const isProxy = (e: any) => (e.metadata as any)?.viaProxy === true;
+    const openSet = new Set(events.filter((e) => e.type === 'EMAIL_OPENED' && !isProxy(e)).map((e) => e.contactId));
+    const clickSet = new Set(events.filter((e) => e.type === 'LINK_CLICKED').map((e) => e.contactId));
+
+    const rows = enrollments.map((enr) => {
+      const sent = enr.executions.filter((ex) => ex.status === 'SENT').length;
+      return [
+        enr.contact.email,
+        enr.contact.name || '',
+        enr.status,
+        enr.enrolledAt.toISOString(),
+        sent,
+        openSet.has(enr.contactId),
+        clickSet.has(enr.contactId),
+      ].join(',');
+    });
+
+    const csv = ['Email,Name,Status,Enrolled At,Steps Sent,Opened,Clicked', ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=sequence-${id}-report.csv`);
+    return res.send(csv);
+  } catch (error) {
+    console.error('Export sequence report error:', error);
+    return res.status(500).json({ error: 'Failed to export sequence report' });
   }
 };

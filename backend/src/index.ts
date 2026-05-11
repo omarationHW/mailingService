@@ -14,7 +14,6 @@ import sequenceRoutes from './routes/sequenceRoutes';
 import trackingRoutes from './routes/trackingRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 
-// Force redeploy: migrations included in build script
 const app = express();
 
 // Trust proxy for Railway/production environments
@@ -47,7 +46,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Rate limiter for general API endpoints
 const apiLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
+  max: config.nodeEnv === 'development' ? 2000 : config.rateLimit.maxRequests,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -66,13 +65,21 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Permissive limiter for tracking — allows high volume of opens/clicks but blocks outright abuse
+const trackingLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/contacts', apiLimiter, contactRoutes);
 app.use('/api/contact-lists', apiLimiter, contactListRoutes);
 app.use('/api/templates', apiLimiter, templateRoutes);
 app.use('/api/campaigns', apiLimiter, campaignRoutes);
 app.use('/api/sequences', apiLimiter, sequenceRoutes);
-app.use('/api/track', trackingRoutes); // No rate limit for tracking (email opens/clicks)
+app.use('/api/track', trackingLimiter, trackingRoutes);
 app.use('/api/analytics', apiLimiter, analyticsRoutes);
 
 app.use(errorHandler);
@@ -80,51 +87,10 @@ app.use(errorHandler);
 const PORT = config.port;
 
 app.listen(PORT, () => {
-  console.log(`
-🚀 Email Marketing Platform API is running!
-
-📍 Server: http://localhost:${PORT}
-🏥 Health: http://localhost:${PORT}/health
-📚 Environment: ${config.nodeEnv}
-
-Available endpoints:
-  POST   /api/auth/register
-  POST   /api/auth/login
-  GET    /api/auth/me
-
-  GET    /api/contacts
-  POST   /api/contacts
-  POST   /api/contacts/import
-  GET    /api/contacts/export
-
-  GET    /api/contact-lists
-  POST   /api/contact-lists
-  GET    /api/contact-lists/:id
-  POST   /api/contact-lists/:id/contacts
-  DELETE /api/contact-lists/:id/contacts/:contactId
-
-  GET    /api/templates
-  POST   /api/templates
-
-  GET    /api/campaigns
-  POST   /api/campaigns
-  POST   /api/campaigns/:id/send
-
-  GET    /api/sequences
-  POST   /api/sequences
-  GET    /api/sequences/:id
-  POST   /api/sequences/:id/enroll
-  GET    /api/sequences/:id/enrollments
-
-  GET    /api/track/open/:token
-  GET    /api/track/click/:token
-
-  GET    /api/analytics/dashboard
-  GET    /api/analytics/campaigns/:id
-  `);
+  console.log(`🚀 API running on port ${PORT} [${config.nodeEnv}] — tracking: ${config.app.url}`);
 
   // Start sequence automation worker
-  sequenceService.startWorker(60000); // Check every 60 seconds
+  sequenceService.startWorker(60000);
 });
 
 export default app;

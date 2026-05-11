@@ -5,7 +5,7 @@ import { hashPassword, comparePassword, generateToken } from '../utils/auth';
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   name: z.string().optional(),
   role: z.enum(['ADMIN', 'EDITOR', 'VIEWER']).optional(),
 });
@@ -96,6 +96,71 @@ export const login = async (req: Request, res: Response) => {
     }
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Failed to login' });
+  }
+};
+
+export const updateProfile = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+
+    const schema = z.object({
+      name: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    if (data.email) {
+      const existing = await prisma.user.findUnique({ where: { email: data.email } });
+      if (existing && existing.id !== req.user.id) {
+        return res.status(400).json({ error: 'El email ya está en uso' });
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.email !== undefined && { email: data.email }),
+      },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
+    });
+
+    return res.json({ user });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('UpdateProfile error:', error);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+
+    const schema = z.object({
+      currentPassword: z.string(),
+      newPassword: z.string().min(8),
+    });
+    const { currentPassword, newPassword } = schema.parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const valid = await comparePassword(currentPassword, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
+
+    return res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('ChangePassword error:', error);
+    return res.status(500).json({ error: 'Failed to change password' });
   }
 };
 

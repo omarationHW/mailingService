@@ -13,6 +13,7 @@ import Contacts from './pages/Contacts';
 import ContactLists from './pages/ContactLists';
 import ContactListDetail from './pages/ContactListDetail';
 import Templates from './pages/Templates';
+import Settings from './pages/Settings';
 import Sequences from './pages/Sequences';
 import NewSequence from './pages/NewSequence';
 import SequenceDetail from './pages/SequenceDetail';
@@ -40,14 +41,17 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="campaigns" element={<Campaigns />} />
         <Route path="campaigns/new" element={<NewCampaign />} />
+        <Route path="campaigns/:id/edit" element={<NewCampaign />} />
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="sequences" element={<Sequences />} />
         <Route path="sequences/new" element={<NewSequence />} />
+        <Route path="sequences/:id/edit" element={<NewSequence />} />
         <Route path="sequences/:id" element={<SequenceDetail />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contact-lists" element={<ContactLists />} />
         <Route path="contact-lists/:id" element={<ContactListDetail />} />
         <Route path="templates" element={<Templates />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

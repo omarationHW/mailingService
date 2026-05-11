@@ -161,4 +161,21 @@ export const sequencesApi = {
     const response = await api.get(`/sequences/${sequenceId}/analytics`);
     return response.data;
   },
+
+  previewEnrollByTags: async (sequenceId: string, tags?: string): Promise<{ count: number; contacts: Array<{ id: string; email: string; name?: string }> }> => {
+    const response = await api.get(`/sequences/${sequenceId}/enroll-by-tags/preview`, {
+      params: tags ? { tags } : {},
+    });
+    return response.data;
+  },
+
+  enrollByTags: async (sequenceId: string, tags?: string): Promise<{ enrolled: number }> => {
+    const response = await api.post(`/sequences/${sequenceId}/enroll-by-tags`, { tags });
+    return response.data;
+  },
+
+  exportReport: async (sequenceId: string): Promise<Blob> => {
+    const response = await api.get(`/sequences/${sequenceId}/export`, { responseType: 'blob' });
+    return response.data;
+  },
 };

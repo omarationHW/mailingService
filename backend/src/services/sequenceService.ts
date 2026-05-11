@@ -38,7 +38,8 @@ export class SequenceService {
       take: 100, // Process max 100 at a time
     });
 
-    console.log(`\n⚡ Processing ${pendingExecutions.length} pending sequence executions...`);
+    if (pendingExecutions.length === 0) return { processed: 0, sent: 0, failed: 0 };
+    console.log(`⚡ Processing ${pendingExecutions.length} pending sequence executions...`);
 
     let sent = 0;
     let failed = 0;
@@ -52,7 +53,6 @@ export class SequenceService {
             status: SequenceStepStatus.SKIPPED,
           },
         });
-        console.log(`⏭️  Skipped execution ${execution.id} - enrollment not active`);
         continue;
       }
 
@@ -64,21 +64,18 @@ export class SequenceService {
             status: SequenceStepStatus.SKIPPED,
           },
         });
-        console.log(`⏭️  Skipped execution ${execution.id} - sequence not active`);
         continue;
       }
 
       try {
-        console.log(`\n📨 Sending sequence email for execution ${execution.id}`);
-        console.log(`   Sequence: ${execution.step.sequence.name}`);
-        console.log(`   Step: ${execution.step.name}`);
-        console.log(`   Contact: ${execution.enrollment.contact.email}`);
 
         // Prepare variables for email
         const variables = {
           nombre: execution.enrollment.contact.name || execution.enrollment.contact.email,
-          email: execution.enrollment.contact.email,
+          name: execution.enrollment.contact.name || execution.enrollment.contact.email,
           empresa: execution.enrollment.contact.company || '',
+          company: execution.enrollment.contact.company || '',
+          email: execution.enrollment.contact.email,
           ...(execution.enrollment.contact.customFields as Record<string, any> || {}),
         };
 
@@ -110,7 +107,6 @@ export class SequenceService {
           });
 
           sent++;
-          console.log(`✅ Successfully sent sequence email for execution ${execution.id}`);
 
           // Check if this was the last step and mark enrollment as completed
           const allExecutions = await prisma.sequenceStepExecution.findMany({
@@ -130,7 +126,7 @@ export class SequenceService {
                 completedAt: new Date(),
               },
             });
-            console.log(`🎉 Enrollment ${execution.enrollmentId} completed!`);
+            console.log(`Enrollment ${execution.enrollmentId} completed`);
           }
         } else {
           // Update execution status to FAILED
@@ -143,7 +139,7 @@ export class SequenceService {
           });
 
           failed++;
-          console.log(`❌ Failed to send sequence email for execution ${execution.id}: ${result.error}`);
+          console.error(`Failed sequence execution ${execution.id}: ${result.error}`);
         }
       } catch (error) {
         console.error(`❌ Error processing execution ${execution.id}:`, error);
@@ -160,10 +156,7 @@ export class SequenceService {
       }
     }
 
-    console.log(`\n⚡ Sequence processing completed!`);
-    console.log(`   Processed: ${pendingExecutions.length}`);
-    console.log(`   Sent: ${sent}`);
-    console.log(`   Failed: ${failed}\n`);
+    console.log(`Sequence worker: ${sent} sent, ${failed} failed (of ${pendingExecutions.length})`);
 
     return {
       processed: pendingExecutions.length,
@@ -177,7 +170,7 @@ export class SequenceService {
    * Runs every minute to check for pending executions
    */
   startWorker(intervalMs: number = 60000): NodeJS.Timeout {
-    console.log(`\n🤖 Starting sequence worker (interval: ${intervalMs / 1000}s)...\n`);
+    console.log(`Sequence worker started (interval: ${intervalMs / 1000}s)`);
 
     // Run immediately on start
     this.processPendingExecutions().catch(console.error);

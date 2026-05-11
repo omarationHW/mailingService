@@ -21,6 +21,8 @@ export interface Contact {
 export interface Template {
   id: string;
   name: string;
+  subject?: string;
+  preheader?: string;
   htmlContent: string;
   thumbnail?: string;
   description?: string;
@@ -32,6 +34,7 @@ export interface Campaign {
   id: string;
   name: string;
   subject: string;
+  preheader?: string;
   htmlContent: string;
   fromEmail: string;
   fromName: string;
@@ -40,6 +43,10 @@ export interface Campaign {
   sentAt?: string;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    campaignContacts: number;
+    events?: number;
+  };
 }
 
 export interface DashboardAnalytics {
@@ -51,6 +58,12 @@ export interface DashboardAnalytics {
     totalClicks: number;
     openRate: number;
     clickRate: number;
+    changes: {
+      campaigns: number | null;
+      contacts: number | null;
+      openRate: number | null;
+      clickRate: number | null;
+    };
   };
   recentCampaigns: Array<{
     id: string;
@@ -83,11 +96,11 @@ export interface CampaignAnalytics {
   };
   metrics: {
     sent: number;
-    opened: number;
     clicked: number;
     bounced: number;
     failed: number;
     uniqueOpens: number;
+    proxyOpens: number;
     uniqueClicks: number;
     openRate: number;
     clickRate: number;

@@ -4,6 +4,8 @@ import prisma from '../config/database';
 
 const templateSchema = z.object({
   name: z.string().min(1),
+  subject: z.string().optional(),
+  preheader: z.string().optional(),
   htmlContent: z.string().min(1),
   thumbnail: z.string().optional(),
   description: z.string().optional(),
@@ -79,6 +81,8 @@ export const createTemplate = async (req: Request, res: Response) => {
     const template = await prisma.template.create({
       data: {
         name: data.name,
+        subject: data.subject,
+        preheader: data.preheader,
         htmlContent: data.htmlContent,
         thumbnail: data.thumbnail,
         description: data.description,
@@ -111,8 +115,10 @@ export const updateTemplate = async (req: Request, res: Response) => {
     const template = await prisma.template.update({
       where: { id },
       data: {
-        ...(data.name && { name: data.name }),
-        ...(data.htmlContent && { htmlContent: data.htmlContent }),
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.subject !== undefined && { subject: data.subject }),
+        ...(data.preheader !== undefined && { preheader: data.preheader }),
+        ...(data.htmlContent !== undefined && { htmlContent: data.htmlContent }),
         ...(data.thumbnail !== undefined && { thumbnail: data.thumbnail }),
         ...(data.description !== undefined && { description: data.description }),
       },

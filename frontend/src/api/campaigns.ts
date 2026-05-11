@@ -17,7 +17,7 @@ export const campaignsApi = {
     return response.data;
   },
 
-  update: async (id: string, data: Partial<Campaign>) => {
+  update: async (id: string, data: any) => {
     const response = await api.put(`/campaigns/${id}`, data);
     return response.data;
   },
@@ -29,6 +29,24 @@ export const campaignsApi = {
 
   send: async (id: string) => {
     const response = await api.post(`/campaigns/${id}/send`);
+    return response.data;
+  },
+
+  retryFailed: async (id: string) => {
+    const response = await api.post(`/campaigns/${id}/retry-failed`);
+    return response.data;
+  },
+
+  getStats: async (): Promise<Record<string, number>> => {
+    const response = await api.get('/campaigns/stats');
+    return response.data;
+  },
+
+  previewRecipients: async (params: {
+    tags?: string;
+    contactListIds?: string;
+  }): Promise<{ count: number }> => {
+    const response = await api.get('/campaigns/preview-recipients', { params });
     return response.data;
   },
 };

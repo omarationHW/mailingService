@@ -22,6 +22,7 @@ export interface ContactListMember {
     name?: string;
     company?: string;
     phone?: string;
+    tags: string[];
   };
 }
 
@@ -55,27 +56,36 @@ export const contactListsApi = {
     return response.data;
   },
 
+  batchDelete: async (ids: string[]) => {
+    const response = await api.delete('/contact-lists/batch', { data: { ids } });
+    return response.data;
+  },
+
   addContacts: async (id: string, contactIds: string[]) => {
-    const response = await api.post(`/contact-lists/${id}/contacts`, {
-      contactIds,
-    });
+    const response = await api.post(`/contact-lists/${id}/contacts`, { contactIds });
     return response.data;
   },
 
   removeContact: async (listId: string, contactId: string) => {
-    const response = await api.delete(
-      `/contact-lists/${listId}/contacts/${contactId}`
-    );
+    const response = await api.delete(`/contact-lists/${listId}/contacts/${contactId}`);
+    return response.data;
+  },
+
+  batchRemoveContacts: async (listId: string, contactIds: string[]) => {
+    const response = await api.delete(`/contact-lists/${listId}/contacts/batch`, { data: { contactIds } });
     return response.data;
   },
 
   getContacts: async (
     listId: string,
-    params?: { page?: number; limit?: number }
+    params?: { page?: number; limit?: number; search?: string; company?: string; tags?: string }
   ) => {
-    const response = await api.get(`/contact-lists/${listId}/contacts`, {
-      params,
-    });
+    const response = await api.get(`/contact-lists/${listId}/contacts`, { params });
+    return response.data;
+  },
+
+  getListMeta: async (listId: string): Promise<{ companies: string[]; tags: string[] }> => {
+    const response = await api.get(`/contact-lists/${listId}/contacts/meta`);
     return response.data;
   },
 };

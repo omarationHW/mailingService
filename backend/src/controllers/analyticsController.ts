@@ -4,25 +4,63 @@ import { EventType } from '@prisma/client';
 
 export const getDashboardAnalytics = async (_req: Request, res: Response) => {
   try {
+    // Date boundaries for current and previous month
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
     const [
       totalCampaigns,
+      prevMonthCampaigns,
       totalContacts,
+      prevMonthContacts,
       totalSent,
+      prevMonthSent,
       totalOpens,
+      prevMonthOpens,
       totalClicks,
+      prevMonthClicks,
       recentCampaigns,
       topContacts,
     ] = await Promise.all([
-      prisma.campaign.count(),
+      // Current totals
+      prisma.campaign.count({
+        where: { status: { in: ['COMPLETED', 'SENDING'] } },
+      }),
+      prisma.campaign.count({
+        where: {
+          status: { in: ['COMPLETED', 'SENDING'] },
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
+      }),
       prisma.contact.count(),
-      prisma.event.count({
-        where: { type: EventType.EMAIL_SENT },
+      prisma.contact.count({
+        where: { createdAt: { gte: prevMonthStart, lte: prevMonthEnd } },
       }),
+      prisma.event.count({ where: { type: EventType.EMAIL_SENT } }),
       prisma.event.count({
-        where: { type: EventType.EMAIL_OPENED },
+        where: {
+          type: EventType.EMAIL_SENT,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
       }),
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) as count FROM events
+        WHERE type = 'EMAIL_OPENED' AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
+      `,
+      prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) as count FROM events
+        WHERE type = 'EMAIL_OPENED'
+          AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
+          AND created_at >= ${prevMonthStart} AND created_at <= ${prevMonthEnd}
+      `,
+      prisma.event.count({ where: { type: EventType.LINK_CLICKED } }),
       prisma.event.count({
-        where: { type: EventType.LINK_CLICKED },
+        where: {
+          type: EventType.LINK_CLICKED,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+        },
       }),
       prisma.campaign.findMany({
         take: 5,
@@ -58,22 +96,52 @@ export const getDashboardAnalytics = async (_req: Request, res: Response) => {
       `,
     ]);
 
-    const openRate = totalSent > 0 ? (totalOpens / totalSent) * 100 : 0;
+    // Current month counts for rate comparison
+    const currentMonthSent = await prisma.event.count({
+      where: { type: EventType.EMAIL_SENT, createdAt: { gte: currentMonthStart } },
+    });
+    const [currentMonthOpensRaw] = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) as count FROM events
+      WHERE type = 'EMAIL_OPENED'
+        AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
+        AND created_at >= ${currentMonthStart}
+    `;
+    const currentMonthOpens = Number(currentMonthOpensRaw.count);
+    const currentMonthClicks = await prisma.event.count({
+      where: { type: EventType.LINK_CLICKED, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthCampaigns = await prisma.campaign.count({
+      where: { status: { in: ['COMPLETED', 'SENDING'] }, createdAt: { gte: currentMonthStart } },
+    });
+    const currentMonthContacts = await prisma.contact.count({
+      where: { createdAt: { gte: currentMonthStart } },
+    });
+
+    const calcChange = (current: number, previous: number): number | null => {
+      if (previous === 0) return null;
+      return parseFloat((((current - previous) / previous) * 100).toFixed(1));
+    };
+
+    const totalOpensCount = Number((totalOpens as Array<{ count: bigint }>)[0].count);
+    const prevMonthOpensCount = Number((prevMonthOpens as Array<{ count: bigint }>)[0].count);
+
+    const currentOpenRate = currentMonthSent > 0 ? (currentMonthOpens / currentMonthSent) * 100 : 0;
+    const prevOpenRate = prevMonthSent > 0 ? (prevMonthOpensCount / prevMonthSent) * 100 : 0;
+    const currentClickRate = currentMonthSent > 0 ? (currentMonthClicks / currentMonthSent) * 100 : 0;
+    const prevClickRate = prevMonthSent > 0 ? (prevMonthClicks / prevMonthSent) * 100 : 0;
+
+    const openRate = totalSent > 0 ? (totalOpensCount / totalSent) * 100 : 0;
     const clickRate = totalSent > 0 ? (totalClicks / totalSent) * 100 : 0;
 
     const last30Days = new Date();
     last30Days.setDate(last30Days.getDate() - 30);
 
     const engagementOverTime = await prisma.$queryRaw<
-      Array<{
-        date: Date;
-        opens: bigint;
-        clicks: bigint;
-      }>
+      Array<{ date: Date; opens: bigint; clicks: bigint }>
     >`
       SELECT
         DATE(created_at) as date,
-        COUNT(CASE WHEN type = 'EMAIL_OPENED' THEN 1 END) as opens,
+        COUNT(CASE WHEN type = 'EMAIL_OPENED' AND (metadata->>'viaProxy') IS DISTINCT FROM 'true' THEN 1 END) as opens,
         COUNT(CASE WHEN type = 'LINK_CLICKED' THEN 1 END) as clicks
       FROM events
       WHERE created_at >= ${last30Days}
@@ -86,10 +154,22 @@ export const getDashboardAnalytics = async (_req: Request, res: Response) => {
         totalCampaigns,
         totalContacts,
         totalSent,
-        totalOpens,
+        totalOpens: totalOpensCount,
         totalClicks,
         openRate: parseFloat(openRate.toFixed(2)),
         clickRate: parseFloat(clickRate.toFixed(2)),
+        changes: {
+          campaigns: calcChange(currentMonthCampaigns, prevMonthCampaigns),
+          contacts: calcChange(currentMonthContacts, prevMonthContacts),
+          openRate: calcChange(
+            parseFloat(currentOpenRate.toFixed(2)),
+            parseFloat(prevOpenRate.toFixed(2))
+          ),
+          clickRate: calcChange(
+            parseFloat(currentClickRate.toFixed(2)),
+            parseFloat(prevClickRate.toFixed(2))
+          ),
+        },
       },
       recentCampaigns: recentCampaigns.map((c) => ({
         id: c.id,
@@ -136,131 +216,90 @@ export const getCampaignAnalytics = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    const [sent, opened, clicked, bounced, failed, uniqueOpens, uniqueClicks] = await Promise.all([
-      prisma.event.count({
-        where: {
-          campaignId: id,
-          type: EventType.EMAIL_SENT,
-        },
-      }),
-      prisma.event.count({
-        where: {
-          campaignId: id,
-          type: EventType.EMAIL_OPENED,
-        },
-      }),
-      prisma.event.count({
-        where: {
-          campaignId: id,
-          type: EventType.LINK_CLICKED,
-        },
-      }),
-      prisma.event.count({
-        where: {
-          campaignId: id,
-          type: EventType.EMAIL_BOUNCED,
-        },
-      }),
-      prisma.event.count({
-        where: {
-          campaignId: id,
-          type: EventType.EMAIL_FAILED,
-        },
-      }),
+    const [sent, clicked, bounced, failed, uniqueOpens, proxyOpens, uniqueClicks] = await Promise.all([
+      prisma.event.count({ where: { campaignId: id, type: EventType.EMAIL_SENT } }),
+      prisma.event.count({ where: { campaignId: id, type: EventType.LINK_CLICKED } }),
+      prisma.event.count({ where: { campaignId: id, type: EventType.EMAIL_BOUNCED } }),
+      prisma.event.count({ where: { campaignId: id, type: EventType.EMAIL_FAILED } }),
+      // Unique opens: only non-proxy
+      prisma.$queryRaw<Array<{ contact_id: string }>>`
+        SELECT DISTINCT contact_id FROM events
+        WHERE campaign_id = ${id}::uuid
+          AND type = 'EMAIL_OPENED'
+          AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
+      `,
+      // Proxy opens: for disclosure note
+      prisma.$queryRaw<Array<{ contact_id: string }>>`
+        SELECT DISTINCT contact_id FROM events
+        WHERE campaign_id = ${id}::uuid
+          AND type = 'EMAIL_OPENED'
+          AND (metadata->>'viaProxy') = 'true'
+      `,
       prisma.event.groupBy({
         by: ['contactId'],
-        where: {
-          campaignId: id,
-          type: EventType.EMAIL_OPENED,
-        },
-      }),
-      prisma.event.groupBy({
-        by: ['contactId'],
-        where: {
-          campaignId: id,
-          type: EventType.LINK_CLICKED,
-        },
+        where: { campaignId: id, type: EventType.LINK_CLICKED },
       }),
     ]);
 
-    const openRate = sent > 0 ? (uniqueOpens.length / sent) * 100 : 0;
+    const uniqueOpensCount = (uniqueOpens as Array<{ contact_id: string }>).length;
+    const proxyOpensCount = (proxyOpens as Array<{ contact_id: string }>).length;
+    const openRate = sent > 0 ? (uniqueOpensCount / sent) * 100 : 0;
     const clickRate = sent > 0 ? (uniqueClicks.length / sent) * 100 : 0;
     const bounceRate = sent > 0 ? (bounced / sent) * 100 : 0;
 
     const deviceStats = await prisma.$queryRaw<
-      Array<{
-        device: string;
-        count: bigint;
-      }>
+      Array<{ device: string; count: bigint }>
     >`
-      SELECT
-        COALESCE(device, 'unknown') as device,
-        COUNT(*) as count
+      SELECT COALESCE(device, 'unknown') as device, COUNT(*) as count
       FROM events
-      WHERE campaign_id = ${id} AND type = 'EMAIL_OPENED'
+      WHERE campaign_id = ${id}::uuid AND type = 'EMAIL_OPENED'
+        AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
       GROUP BY device
     `;
 
     const countryStats = await prisma.$queryRaw<
-      Array<{
-        country: string;
-        count: bigint;
-      }>
+      Array<{ country: string; count: bigint }>
     >`
-      SELECT
-        COALESCE(country, 'unknown') as country,
-        COUNT(*) as count
+      SELECT COALESCE(country, 'unknown') as country, COUNT(*) as count
       FROM events
-      WHERE campaign_id = ${id} AND type = 'EMAIL_OPENED'
+      WHERE campaign_id = ${id}::uuid AND type = 'EMAIL_OPENED'
+        AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
       GROUP BY country
       ORDER BY count DESC
       LIMIT 10
     `;
 
     const clickedLinks = await prisma.$queryRaw<
-      Array<{
-        url: string;
-        count: bigint;
-      }>
+      Array<{ url: string; count: bigint }>
     >`
-      SELECT
-        metadata->>'url' as url,
-        COUNT(*) as count
+      SELECT metadata->>'url' as url, COUNT(*) as count
       FROM events
-      WHERE campaign_id = ${id} AND type = 'LINK_CLICKED'
+      WHERE campaign_id = ${id}::uuid AND type = 'LINK_CLICKED'
       GROUP BY metadata->>'url'
       ORDER BY count DESC
       LIMIT 10
     `;
 
     const opensByHour = await prisma.$queryRaw<
-      Array<{
-        hour: number;
-        count: bigint;
-      }>
+      Array<{ hour: number; count: bigint }>
     >`
-      SELECT
-        EXTRACT(HOUR FROM created_at)::int as hour,
-        COUNT(*) as count
+      SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*) as count
       FROM events
-      WHERE campaign_id = ${id} AND type = 'EMAIL_OPENED'
+      WHERE campaign_id = ${id}::uuid AND type = 'EMAIL_OPENED'
+        AND (metadata->>'viaProxy') IS DISTINCT FROM 'true'
       GROUP BY hour
       ORDER BY hour ASC
     `;
 
     const engagementTimeline = await prisma.$queryRaw<
-      Array<{
-        date: Date;
-        opens: bigint;
-        clicks: bigint;
-      }>
+      Array<{ date: Date; opens: bigint; clicks: bigint }>
     >`
       SELECT
         DATE(created_at) as date,
-        COUNT(CASE WHEN type = 'EMAIL_OPENED' THEN 1 END) as opens,
+        COUNT(CASE WHEN type = 'EMAIL_OPENED' AND (metadata->>'viaProxy') IS DISTINCT FROM 'true' THEN 1 END) as opens,
         COUNT(CASE WHEN type = 'LINK_CLICKED' THEN 1 END) as clicks
       FROM events
-      WHERE campaign_id = ${id}
+      WHERE campaign_id = ${id}::uuid
       GROUP BY DATE(created_at)
       ORDER BY date ASC
     `;
@@ -275,11 +314,11 @@ export const getCampaignAnalytics = async (req: Request, res: Response) => {
       },
       metrics: {
         sent,
-        opened,
         clicked,
         bounced,
         failed,
-        uniqueOpens: uniqueOpens.length,
+        uniqueOpens: uniqueOpensCount,
+        proxyOpens: proxyOpensCount,
         uniqueClicks: uniqueClicks.length,
         openRate: parseFloat(openRate.toFixed(2)),
         clickRate: parseFloat(clickRate.toFixed(2)),
