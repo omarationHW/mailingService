@@ -5,7 +5,7 @@ import { hashPassword, comparePassword, generateToken } from '../utils/auth';
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   name: z.string().optional(),
   role: z.enum(['ADMIN', 'EDITOR', 'VIEWER']).optional(),
 });
@@ -141,7 +141,7 @@ export const changePassword = async (req: Request, res: Response) => {
 
     const schema = z.object({
       currentPassword: z.string(),
-      newPassword: z.string().min(6),
+      newPassword: z.string().min(8),
     });
     const { currentPassword, newPassword } = schema.parse(req.body);
 

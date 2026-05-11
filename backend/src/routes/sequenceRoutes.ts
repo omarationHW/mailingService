@@ -12,6 +12,7 @@ import {
   unenrollContact,
   getEnrollments,
   getSequenceAnalytics,
+  exportSequenceReport,
 } from '../controllers/sequenceController';
 import { authenticate } from '../middleware/auth';
 
@@ -39,5 +40,6 @@ router.get('/:id/enrollments', getEnrollments);
 
 // Analytics
 router.get('/:id/analytics', getSequenceAnalytics);
+router.get('/:id/export', exportSequenceReport);
 
 export default router;

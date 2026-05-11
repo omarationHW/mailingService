@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { Link } from 'react-router-dom';
 import { analyticsApi } from '../api/analytics';
 import { DashboardAnalytics } from '../types';
@@ -74,23 +75,22 @@ export default function Dashboard() {
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const loadData = useCallback(async () => {
-    setError(false);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setError(false);
     try {
       const result = await analyticsApi.getDashboard();
       setData(result);
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to load dashboard', err);
-      setError(true);
+      if (!silent) setError(true);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
+  useAutoRefresh(() => loadData(true), 60000);
 
   if (loading) {
     return (
@@ -196,7 +196,16 @@ export default function Dashboard() {
               </div>
               <ChangeBadge value={summary.changes.openRate} />
             </div>
-            <p className="text-gray-600 text-sm font-medium mb-1">Tasa de Apertura</p>
+            <div className="flex items-center gap-1 mb-1">
+              <p className="text-gray-600 text-sm font-medium">Tasa de Apertura</p>
+              <div className="relative group">
+                <AlertCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-gray-800 text-white text-xs rounded-lg p-3 hidden group-hover:block z-10 leading-relaxed shadow-lg">
+                  Solo incluye aperturas humanas confirmadas. Las aperturas detectadas vía Google Image Proxy (Gmail) son excluidas porque el proxy descarga imágenes automáticamente, sin que el destinatario haya abierto el correo. Clientes como Outlook sí generan datos precisos.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                </div>
+              </div>
+            </div>
             <div className="flex items-baseline gap-2">
               <p className="text-3xl font-bold text-gray-900">{summary.openRate}%</p>
               <span className="text-sm text-gray-500">promedio</span>
@@ -240,7 +249,8 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">{summary.totalOpens.toLocaleString()}</p>
-                <p className="text-sm text-gray-500">Aperturas totales</p>
+                <p className="text-sm text-gray-500">Aperturas reales</p>
+                <p className="text-xs text-gray-400">Excluye proxy de Gmail</p>
               </div>
             </div>
             <div className="flex items-center gap-4 pl-6">
@@ -257,9 +267,13 @@ export default function Dashboard() {
 
         {/* Engagement Chart */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="mb-6">
+          <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Interacción en el Tiempo</h2>
             <p className="text-sm text-gray-500">Aperturas y clics de los últimos 30 días</p>
+          </div>
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 mb-5">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
+            <span>Las aperturas mostradas excluyen las detectadas vía Google Image Proxy (Gmail). Outlook y otros clientes generan datos de apertura precisos.</span>
           </div>
           {data.engagementOverTime.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>

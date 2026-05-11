@@ -15,9 +15,14 @@ export class EmailService {
     return result;
   }
 
+  // Convert Markdown-style links [text](url) inside HTML to proper <a href> tags
+  private convertMarkdownLinks(html: string): string {
+    return html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2">$1</a>');
+  }
+
   private injectTrackingPixel(html: string, trackToken: string): string {
     const pixelUrl = `${config.app.url}/api/track/open/${trackToken}`;
-    const trackingPixel = `<img src="${pixelUrl}" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;opacity:0;" />`;
+    const trackingPixel = `<img src="${pixelUrl}" alt="" width="1" height="1" style="border:0;margin:0;padding:0;" />`;
 
     if (html.includes('</body>')) {
       return html.replace('</body>', `${trackingPixel}</body>`);
@@ -84,13 +89,14 @@ ${html}
     sequenceStepExecutionId?: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      console.log(`📧 Sending email to ${params.to}...`);
 
       let html = params.html;
 
       if (params.variables) {
         html = this.replaceVariables(html, params.variables);
       }
+
+      html = this.convertMarkdownLinks(html);
 
       // Asegurar que el HTML tenga encoding UTF-8
       html = this.ensureUtf8Encoding(html);
@@ -108,7 +114,6 @@ ${html}
         },
       });
 
-      console.log(`✅ Email sent successfully to ${params.to} - Message ID: ${result.data?.id}`);
 
       await prisma.event.create({
         data: {
@@ -166,22 +171,14 @@ ${html}
     }>;
     batchSize?: number;
   }): Promise<{ sent: number; failed: number }> {
-    const batchSize = params.batchSize || 10;
+    const batchSize = params.batchSize || 5;
     let sent = 0;
     let failed = 0;
 
-    console.log(`\n🚀 Starting bulk email send for campaign ${params.campaignId}`);
-    console.log(`📊 Total contacts: ${params.contacts.length}`);
-    console.log(`📦 Batch size: ${batchSize}`);
-    console.log(`📧 From: ${params.from.name} <${params.from.email}>`);
-    console.log(`📝 Subject: ${params.subject}\n`);
+    console.log(`Bulk send campaign ${params.campaignId}: ${params.contacts.length} contacts`);
 
     for (let i = 0; i < params.contacts.length; i += batchSize) {
       const batch = params.contacts.slice(i, i + batchSize);
-      const batchNum = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(params.contacts.length / batchSize);
-
-      console.log(`\n📤 Processing batch ${batchNum}/${totalBatches} (${batch.length} emails)...`);
 
       const results = await Promise.allSettled(
         batch.map((contact) =>
@@ -206,17 +203,13 @@ ${html}
         }
       }
 
-      console.log(`✅ Batch ${batchNum} completed: ${sent} sent, ${failed} failed`);
 
       if (i + batchSize < params.contacts.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
 
-    console.log(`\n🏁 Bulk send completed!`);
-    console.log(`✅ Successfully sent: ${sent}`);
-    console.log(`❌ Failed: ${failed}`);
-    console.log(`📊 Success rate: ${((sent / params.contacts.length) * 100).toFixed(2)}%\n`);
+    console.log(`Bulk send done: ${sent} sent, ${failed} failed`);
 
     return { sent, failed };
   }

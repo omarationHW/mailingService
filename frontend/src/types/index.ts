@@ -21,6 +21,8 @@ export interface Contact {
 export interface Template {
   id: string;
   name: string;
+  subject?: string;
+  preheader?: string;
   htmlContent: string;
   thumbnail?: string;
   description?: string;
@@ -94,11 +96,11 @@ export interface CampaignAnalytics {
   };
   metrics: {
     sent: number;
-    opened: number;
     clicked: number;
     bounced: number;
     failed: number;
     uniqueOpens: number;
+    proxyOpens: number;
     uniqueClicks: number;
     openRate: number;
     clickRate: number;

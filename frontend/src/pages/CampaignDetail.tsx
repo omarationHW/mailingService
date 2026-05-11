@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { useParams, useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../api/analytics';
+import { campaignsApi } from '../api/campaigns';
 import { CampaignAnalytics } from '../types';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -9,6 +11,7 @@ import {
 import {
   Download, ArrowLeft, Mail, MousePointerClick, Eye, TrendingUp,
   Globe, Smartphone, Clock, Link as LinkIcon, AlertCircle, Send,
+  RefreshCw, RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -25,22 +28,46 @@ export default function CampaignDetail() {
   const navigate = useNavigate();
   const [data, setData] = useState<CampaignAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
-
-  const loadData = async () => {
-    setError(false);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setError(false);
+    if (silent) setRefreshing(true);
     try {
       const result = await analyticsApi.getCampaign(id!);
       setData(result);
     } catch {
-      setError(true);
-      toast.error('Error al cargar las analíticas');
+      if (!silent) {
+        setError(true);
+        toast.error('Error al cargar las analíticas');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadData();
+  }, [id, loadData]);
+
+  const isSending = data?.campaign.status === 'SENDING';
+  // Poll every 30s while sending; visibilitychange always active
+  useAutoRefresh(() => loadData(true), 30000, isSending);
+
+  const handleRetryFailed = async () => {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const result = await campaignsApi.retryFailed(id);
+      toast.success(`Reintentando ${result.retrying} correos fallidos...`);
+      setTimeout(() => loadData(true), 3000);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error al reintentar correos');
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -132,15 +159,40 @@ export default function CampaignDetail() {
                 )}
               </div>
             </div>
-            {hasSentData && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Manual refresh */}
               <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+                onClick={() => loadData(true)}
+                disabled={refreshing}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                title="Actualizar analíticas"
               >
-                <Download size={15} />
-                Exportar CSV
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                {refreshing ? 'Actualizando...' : 'Actualizar'}
               </button>
-            )}
+
+              {/* Retry failed */}
+              {data.metrics.failed > 0 && (
+                <button
+                  onClick={handleRetryFailed}
+                  disabled={retrying}
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-300 hover:border-orange-400 text-orange-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <RotateCcw size={14} className={retrying ? 'animate-spin' : ''} />
+                  Reintentar {data.metrics.failed} fallido{data.metrics.failed !== 1 ? 's' : ''}
+                </button>
+              )}
+
+              {hasSentData && (
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Download size={15} />
+                  Exportar CSV
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -186,6 +238,7 @@ export default function CampaignDetail() {
                 {
                   label: 'Aperturas únicas', value: data.metrics.uniqueOpens.toLocaleString(),
                   sub: `${data.metrics.openRate}% tasa`, icon: Eye, color: 'bg-purple-100 text-purple-600',
+                  tooltip: 'Estimado. Gmail descarga imágenes via proxy, lo que puede registrar aperturas antes de que el destinatario abra el correo. Es el comportamiento estándar del sector.',
                 },
                 {
                   label: 'Clics únicos', value: data.metrics.uniqueClicks.toLocaleString(),
@@ -195,17 +248,46 @@ export default function CampaignDetail() {
                   label: 'Tasa de rebote', value: `${data.metrics.bounceRate}%`,
                   sub: `${data.metrics.bounced} rebotados`, icon: TrendingUp, color: 'bg-red-100 text-red-600',
                 },
-              ].map(({ label, value, sub, icon: Icon, color }) => (
+              ].map(({ label, value, sub, icon: Icon, color, tooltip }: any) => (
                 <div key={label} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
                   <div className={`w-11 h-11 rounded-lg flex items-center justify-center mb-4 ${color}`}>
                     <Icon className="w-5 h-5" />
                   </div>
-                  <p className="text-sm text-gray-500 font-medium mb-1">{label}</p>
+                  <div className="flex items-center gap-1 mb-1">
+                    <p className="text-sm text-gray-500 font-medium">{label}</p>
+                    {tooltip && (
+                      <div className="relative group">
+                        <AlertCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-2.5 hidden group-hover:block z-10 leading-relaxed shadow-lg">
+                          {tooltip}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-3xl font-bold text-gray-900">{value}</p>
                   {sub && <p className="text-sm text-gray-500 mt-1">{sub}</p>}
                 </div>
               ))}
             </div>
+
+            {/* Gmail proxy notice */}
+            {data.metrics.proxyOpens > 0 && data.metrics.uniqueOpens === 0 && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                <span>
+                  Se detectaron <strong>{data.metrics.proxyOpens}</strong> apertura{data.metrics.proxyOpens !== 1 ? 's' : ''} vía Google Image Proxy (Gmail). Estas no se contabilizan como aperturas reales porque el proxy de Gmail descarga las imágenes automáticamente antes de que el destinatario abra el correo. Las métricas de dispositivos, países y horarios solo reflejan aperturas humanas confirmadas.
+                </span>
+              </div>
+            )}
+            {data.metrics.proxyOpens > 0 && data.metrics.uniqueOpens > 0 && (
+              <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+                <span>
+                  Nota: {data.metrics.proxyOpens} apertura{data.metrics.proxyOpens !== 1 ? 's' : ''} adicional{data.metrics.proxyOpens !== 1 ? 'es' : ''} detectada{data.metrics.proxyOpens !== 1 ? 's' : ''} vía Google Image Proxy (Gmail) fueron excluidas de las métricas para mayor precisión.
+                </span>
+              </div>
+            )}
 
             {/* Engagement Timeline */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">

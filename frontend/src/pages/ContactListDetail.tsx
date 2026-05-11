@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { contactListsApi, ContactList, ContactListMember } from '../api/contactLists';
 import { contactsApi } from '../api/contacts';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft, UserPlus, Trash2, Mail, Building2, Phone,
   X, Search, Users, List, AlertTriangle, Tag, ChevronLeft, ChevronRight,
+  ChevronDown, Filter,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -34,8 +35,23 @@ export default function ContactListDetail() {
   const [total, setTotal] = useState(0);
   const [memberSearch, setMemberSearch] = useState('');
 
+  // Filters
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [metaCompanies, setMetaCompanies] = useState<string[]>([]);
+  const [metaTags, setMetaTags] = useState<string[]>([]);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Batch selection
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchRemoving, setBatchRemoving] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [availableContacts, setAvailableContacts] = useState<Contact[]>([]);
+  const [addContactsPage, setAddContactsPage] = useState(1);
+  const [addContactsTotal, setAddContactsTotal] = useState(0);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [searchContacts, setSearchContacts] = useState('');
   const [adding, setAdding] = useState(false);
@@ -53,6 +69,14 @@ export default function ContactListDetail() {
     }
   }, [id, navigate]);
 
+  const loadMeta = useCallback(async () => {
+    try {
+      const data = await contactListsApi.getListMeta(id!);
+      setMetaCompanies(data.companies);
+      setMetaTags(data.tags);
+    } catch { /* non-critical */ }
+  }, [id]);
+
   const loadMembers = useCallback(async () => {
     setMembersLoading(true);
     try {
@@ -60,6 +84,8 @@ export default function ContactListDetail() {
         page,
         limit,
         search: memberSearch || undefined,
+        company: companyFilter || undefined,
+        tags: tagFilter.length > 0 ? tagFilter.join(',') : undefined,
       });
       setMembers(data.members);
       setTotalPages(data.pagination.totalPages);
@@ -69,45 +95,112 @@ export default function ContactListDetail() {
     } finally {
       setMembersLoading(false);
     }
-  }, [id, page, limit, memberSearch]);
+  }, [id, page, limit, memberSearch, companyFilter, tagFilter]);
 
-  useEffect(() => { loadList(); }, [loadList]);
+  useEffect(() => { loadList(); loadMeta(); }, [loadList, loadMeta]);
 
   useEffect(() => {
     const t = setTimeout(() => loadMembers(), memberSearch ? 400 : 0);
     return () => clearTimeout(t);
   }, [loadMembers]);
 
-  useEffect(() => { setPage(1); }, [memberSearch, limit]);
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [memberSearch, companyFilter, tagFilter, limit]);
+
+  useEffect(() => { setSelected(new Set()); }, [page]);
+
+  // Close tag dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Sync indeterminate state on select-all checkbox
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const allSelected = members.length > 0 && members.every(m => selected.has(m.contactId));
+    const someSelected = members.some(m => selected.has(m.contactId));
+    selectAllRef.current.checked = allSelected;
+    selectAllRef.current.indeterminate = someSelected && !allSelected;
+  }, [selected, members]);
+
+  const toggleSelect = (contactId: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(contactId) ? next.delete(contactId) : next.add(contactId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = members.every(m => selected.has(m.contactId));
+    if (allSelected) {
+      setSelected(prev => { const next = new Set(prev); members.forEach(m => next.delete(m.contactId)); return next; });
+    } else {
+      setSelected(prev => { const next = new Set(prev); members.forEach(m => next.add(m.contactId)); return next; });
+    }
+  };
+
+  const confirmBatchRemove = () => {
+    const count = selected.size;
+    setModal({
+      open: true,
+      title: 'Remover contactos',
+      message: `¿Remover ${count} contacto${count !== 1 ? 's' : ''} de esta lista? Los contactos no serán eliminados.`,
+      onConfirm: async () => {
+        setModal(MODAL_CLOSED);
+        setBatchRemoving(true);
+        try {
+          await contactListsApi.batchRemoveContacts(id!, Array.from(selected));
+          toast.success(`${count} contacto${count !== 1 ? 's' : ''} removido${count !== 1 ? 's' : ''}`);
+          setSelected(new Set());
+          loadList();
+          loadMeta();
+          loadMembers();
+        } catch {
+          toast.error('Error al remover contactos');
+        } finally {
+          setBatchRemoving(false);
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     if (!showAddModal) return;
     const t = setTimeout(async () => {
       try {
-        const data = await contactsApi.getAll({ search: searchContacts || undefined, limit: 100 });
+        const data = await contactsApi.getAll({ search: searchContacts || undefined, limit: 50, page: addContactsPage });
         const memberIds = new Set(members.map(m => m.contactId));
         setAvailableContacts(data.contacts.filter((c: Contact) => !memberIds.has(c.id)));
+        setAddContactsTotal(data.pagination?.total || 0);
       } catch {
         toast.error('Error al cargar contactos');
       }
     }, searchContacts ? 400 : 0);
     return () => clearTimeout(t);
-  }, [showAddModal, searchContacts, members]);
+  }, [showAddModal, searchContacts, members, addContactsPage]);
 
   const closeAddModal = () => {
     setShowAddModal(false);
     setSelectedContacts(new Set());
     setSearchContacts('');
+    setAddContactsPage(1);
   };
 
   const handleAddContacts = async () => {
     if (selectedContacts.size === 0) { toast.error('Selecciona al menos un contacto'); return; }
     setAdding(true);
     try {
-      await contactListsApi.addContacts(id!, Array.from(selectedContacts));
-      toast.success(`${selectedContacts.size} contacto(s) agregado(s)`);
+      const result = await contactListsApi.addContacts(id!, Array.from(selectedContacts));
+      toast.success(`${result.added} contacto(s) agregado(s)`);
       closeAddModal();
       loadList();
+      loadMeta();
       loadMembers();
     } catch {
       toast.error('Error al agregar contactos');
@@ -127,6 +220,7 @@ export default function ContactListDetail() {
           await contactListsApi.removeContact(id!, contactId);
           toast.success('Contacto removido');
           loadList();
+          loadMeta();
           loadMembers();
         } catch {
           toast.error('Error al remover contacto');
@@ -141,6 +235,18 @@ export default function ContactListDetail() {
       next.has(contactId) ? next.delete(contactId) : next.add(contactId);
       return next;
     });
+  };
+
+  const toggleTagFilter = (tag: string) => {
+    setTagFilter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const hasFilters = memberSearch || companyFilter || tagFilter.length > 0;
+
+  const clearFilters = () => {
+    setMemberSearch('');
+    setCompanyFilter('');
+    setTagFilter([]);
   };
 
   const renderPagination = () => {
@@ -198,6 +304,8 @@ export default function ContactListDetail() {
 
   if (!list) return null;
 
+  const selectedCount = selected.size;
+
   return (
     <>
       {modal.open && (
@@ -252,7 +360,7 @@ export default function ContactListDetail() {
 
           {/* Members table */}
           <div className="bg-white rounded-xl border border-gray-200">
-            {!membersLoading && members.length === 0 && !memberSearch ? (
+            {!membersLoading && members.length === 0 && !hasFilters ? (
               <div className="text-center py-12">
                 <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="w-7 h-7 text-orange-500" />
@@ -266,23 +374,87 @@ export default function ContactListDetail() {
               </div>
             ) : (
               <>
-                {/* Search bar */}
-                <div className="p-4 border-b border-gray-100">
-                  <div className="relative max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                    <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
-                      placeholder="Buscar en esta lista..."
-                      className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
-                    {memberSearch && (
-                      <button onClick={() => setMemberSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        <X size={14} />
+                {/* Filters bar */}
+                <div className="p-4 border-b border-gray-100 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                      <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                        placeholder="Buscar en esta lista..."
+                        className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+                      {memberSearch && (
+                        <button onClick={() => setMemberSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Company filter */}
+                    {metaCompanies.length > 0 && (
+                      <select value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                        <option value="">Todas las empresas</option>
+                        {metaCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    )}
+
+                    {/* Tag filter dropdown */}
+                    {metaTags.length > 0 && (
+                      <div className="relative" ref={tagDropdownRef}>
+                        <button
+                          onClick={() => setShowTagDropdown(v => !v)}
+                          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${tagFilter.length > 0 ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                          <Tag size={14} />
+                          {tagFilter.length > 0 ? `${tagFilter.length} etiqueta${tagFilter.length !== 1 ? 's' : ''}` : 'Etiquetas'}
+                          <ChevronDown size={14} />
+                        </button>
+                        {showTagDropdown && (
+                          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-[180px] max-h-52 overflow-y-auto">
+                            {metaTags.map(tag => (
+                              <label key={tag} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                                <input type="checkbox" checked={tagFilter.includes(tag)} onChange={() => toggleTagFilter(tag)}
+                                  className="accent-orange-600 w-3.5 h-3.5" />
+                                <span className="text-gray-700">{tag}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Clear filters */}
+                    {hasFilters && (
+                      <button onClick={clearFilters}
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <Filter size={14} />
+                        Limpiar
                       </button>
                     )}
                   </div>
-                  {memberSearch && !membersLoading && (
-                    <p className="text-xs text-gray-400 mt-2">{total} resultado{total !== 1 ? 's' : ''}</p>
+
+                  {hasFilters && !membersLoading && (
+                    <p className="text-xs text-gray-400">{total} resultado{total !== 1 ? 's' : ''}</p>
                   )}
                 </div>
+
+                {/* Batch action bar */}
+                {selectedCount > 0 && (
+                  <div className="flex items-center justify-between bg-orange-50 border-b border-orange-200 px-4 py-3">
+                    <span className="text-sm font-medium text-orange-800">{selectedCount} seleccionado{selectedCount !== 1 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setSelected(new Set())}
+                        className="px-3 py-1.5 text-xs font-medium text-orange-700 bg-white border border-orange-300 rounded-lg hover:bg-orange-50">
+                        Deseleccionar
+                      </button>
+                      <button onClick={confirmBatchRemove} disabled={batchRemoving}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg">
+                        <Trash2 size={13} />
+                        Remover de lista
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="overflow-x-auto">
                   {membersLoading ? (
@@ -293,42 +465,52 @@ export default function ContactListDetail() {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
+                          <th className="px-4 py-3 w-10">
+                            <input type="checkbox" ref={selectAllRef} onChange={toggleSelectAll}
+                              className="accent-orange-600 w-4 h-4 cursor-pointer" />
+                          </th>
                           {['Contacto', 'Email', 'Empresa', 'Teléfono', 'Etiquetas', 'Agregado', ''].map(h => (
-                            <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
+                            <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {members.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-400">
-                              No se encontraron contactos con "{memberSearch}"
+                            <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-400">
+                              No se encontraron contactos con los filtros aplicados
                             </td>
                           </tr>
                         ) : members.map(member => (
-                          <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4 font-medium text-gray-900 text-sm whitespace-nowrap">
+                          <tr key={member.id}
+                            className={`hover:bg-gray-50 transition-colors ${selected.has(member.contactId) ? 'bg-orange-50' : ''}`}>
+                            <td className="px-4 py-4">
+                              <input type="checkbox" checked={selected.has(member.contactId)}
+                                onChange={() => toggleSelect(member.contactId)}
+                                className="accent-orange-600 w-4 h-4 cursor-pointer" />
+                            </td>
+                            <td className="px-4 py-4 font-medium text-gray-900 text-sm whitespace-nowrap">
                               {member.contact.name || <span className="text-gray-400 italic">Sin nombre</span>}
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
                                 <Mail size={14} className="text-gray-400 flex-shrink-0" />
                                 <span className="text-sm text-gray-700">{member.contact.email}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
                                 <Building2 size={14} className="text-gray-400 flex-shrink-0" />
                                 <span className="text-sm text-gray-500">{member.contact.company || '—'}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
                                 <Phone size={14} className="text-gray-400 flex-shrink-0" />
                                 <span className="text-sm text-gray-500">{member.contact.phone || '—'}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               {member.contact.tags?.length > 0 ? (
                                 <div className="flex gap-1 flex-wrap">
                                   {member.contact.tags.slice(0, 3).map((tag, i) => (
@@ -344,10 +526,10 @@ export default function ContactListDetail() {
                                 <span className="text-xs text-gray-300 italic">—</span>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                            <td className="px-4 py-4 text-sm text-gray-500 whitespace-nowrap">
                               {format(new Date(member.addedAt), 'dd/MM/yyyy')}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-4 py-4 text-right">
                               <button
                                 onClick={() => confirmRemove(member.contactId, member.contact.name || member.contact.email)}
                                 className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
@@ -384,7 +566,7 @@ export default function ContactListDetail() {
             <div className="p-4 border-b border-gray-100">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                <input type="text" value={searchContacts} onChange={e => setSearchContacts(e.target.value)}
+                <input type="text" value={searchContacts} onChange={e => { setSearchContacts(e.target.value); setAddContactsPage(1); }}
                   placeholder="Buscar contactos..."
                   className="w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
                 {searchContacts && (
@@ -416,6 +598,21 @@ export default function ContactListDetail() {
                 </div>
               )}
             </div>
+
+            {/* Add modal pagination */}
+            {addContactsTotal > 50 && (
+              <div className="flex items-center justify-between px-5 py-2 border-t border-gray-100">
+                <button onClick={() => setAddContactsPage(p => Math.max(1, p - 1))} disabled={addContactsPage === 1}
+                  className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs text-gray-500">Página {addContactsPage}</span>
+                <button onClick={() => setAddContactsPage(p => p + 1)} disabled={availableContacts.length < 50}
+                  className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-40">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-5 border-t border-gray-200 gap-3">
               {selectedContacts.size > 0 && (

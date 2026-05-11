@@ -173,4 +173,9 @@ export const sequencesApi = {
     const response = await api.post(`/sequences/${sequenceId}/enroll-by-tags`, { tags });
     return response.data;
   },
+
+  exportReport: async (sequenceId: string): Promise<Blob> => {
+    const response = await api.get(`/sequences/${sequenceId}/export`, { responseType: 'blob' });
+    return response.data;
+  },
 };

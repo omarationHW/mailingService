@@ -2,13 +2,20 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+if (nodeEnv === 'production' && jwtSecret === 'your-secret-key-change-in-production') {
+  throw new Error('JWT_SECRET must be set to a secure value in production');
+}
+
 export const config = {
   port: process.env.PORT || 3000,
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   databaseUrl: process.env.DATABASE_URL!,
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 
@@ -17,7 +24,7 @@ export const config = {
   },
 
   app: {
-    url: process.env.APP_URL || 'http://localhost:3000',
+    url: process.env.APP_URL || 'http://localhost:3001',
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   },
 

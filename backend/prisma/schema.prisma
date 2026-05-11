@@ -176,6 +176,8 @@ model Event {
 model Template {
   id          String   @id @default(uuid())
   name        String
+  subject     String?
+  preheader   String?
   htmlContent String   @map("html_content") @db.Text
   thumbnail   String?
   description String?
@@ -237,6 +239,7 @@ model SequenceStep {
   stepOrder             Int            @map("step_order")
   name                  String
   subject               String
+  preheader             String?
   htmlContent           String         @map("html_content") @db.Text
   schedulingType        SchedulingType @default(RELATIVE_DELAY) @map("scheduling_type")
   delayDays             Int            @default(0) @map("delay_days")
