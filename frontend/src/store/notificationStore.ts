@@ -39,7 +39,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const now = new Date();
 
       // Campaigns: FAILED → error
-      for (const c of campaignData.campaigns) {
+      for (const c of campaignData?.campaigns ?? []) {
         if (c.status === 'FAILED') {
           notes.push({
             id: `campaign-failed-${c.id}`,
@@ -70,7 +70,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       }
 
       // Sequences: PAUSED → warning
-      for (const s of sequenceData.sequences ?? []) {
+      for (const s of sequenceData?.sequences ?? []) {
         if (s.status === 'PAUSED') {
           notes.push({
             id: `sequence-paused-${s.id}`,
