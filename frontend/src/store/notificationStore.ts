@@ -97,8 +97,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const merged = capped.map(n => ({ ...n, read: readIds.has(n.id) }));
 
       set({ notifications: merged, lastFetched: now });
-    } catch {
-      // Silent fail — notifications are non-critical
+    } catch (err) {
+      console.warn('[notifications] fetch failed:', err);
     } finally {
       set({ loading: false });
     }
