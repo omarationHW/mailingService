@@ -139,6 +139,7 @@ export default function Dashboard() {
   }
 
   const { summary } = data;
+  const changes = summary.changes ?? { campaigns: null, contacts: null, openRate: null, clickRate: null };
 
   return (
     <div className="p-8">
@@ -168,7 +169,7 @@ export default function Dashboard() {
               <div className="w-11 h-11 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Mail className="w-5 h-5 text-blue-600" />
               </div>
-              <ChangeBadge value={summary.changes.campaigns} />
+              <ChangeBadge value={changes.campaigns} />
             </div>
             <p className="text-gray-600 text-sm font-medium mb-1">Campañas Enviadas</p>
             <p className="text-3xl font-bold text-gray-900">{summary.totalCampaigns}</p>
@@ -181,7 +182,7 @@ export default function Dashboard() {
               <div className="w-11 h-11 bg-emerald-100 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 text-emerald-600" />
               </div>
-              <ChangeBadge value={summary.changes.contacts} />
+              <ChangeBadge value={changes.contacts} />
             </div>
             <p className="text-gray-600 text-sm font-medium mb-1">Contactos Totales</p>
             <p className="text-3xl font-bold text-gray-900">{summary.totalContacts}</p>
@@ -194,7 +195,7 @@ export default function Dashboard() {
               <div className="w-11 h-11 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Eye className="w-5 h-5 text-purple-600" />
               </div>
-              <ChangeBadge value={summary.changes.openRate} />
+              <ChangeBadge value={changes.openRate} />
             </div>
             <div className="flex items-center gap-1 mb-1">
               <p className="text-gray-600 text-sm font-medium">Tasa de Apertura</p>
@@ -219,7 +220,7 @@ export default function Dashboard() {
               <div className="w-11 h-11 bg-orange-100 rounded-lg flex items-center justify-center">
                 <MousePointerClick className="w-5 h-5 text-orange-600" />
               </div>
-              <ChangeBadge value={summary.changes.clickRate} />
+              <ChangeBadge value={changes.clickRate} />
             </div>
             <p className="text-gray-600 text-sm font-medium mb-1">Tasa de Clics</p>
             <div className="flex items-baseline gap-2">
