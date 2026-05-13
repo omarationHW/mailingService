@@ -28,11 +28,11 @@ export default function Layout() {
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // Fetch notifications on mount and every 5 minutes
+  // Fetch notifications after initial render settles, then every 5 minutes
   useEffect(() => {
-    fetchNotifications().catch(() => {});
+    const initial = setTimeout(() => fetchNotifications().catch(() => {}), 2000);
     const interval = setInterval(() => fetchNotifications().catch(() => {}), 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(initial); clearInterval(interval); };
   }, [fetchNotifications]);
 
   // Close dropdowns on outside click
