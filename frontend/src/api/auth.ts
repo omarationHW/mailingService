@@ -2,7 +2,7 @@ import api from './client';
 import { User } from '../types';
 
 export const authApi = {
-  register: async (data: { email: string; password: string; name?: string }) => {
+  createUser: async (data: { email: string; password: string; name?: string; role?: string }) => {
     const response = await api.post('/auth/register', data);
     return response.data;
   },

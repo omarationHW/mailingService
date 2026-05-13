@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   register: async (email: string, password: string, name?: string) => {
-    const data = await authApi.register({ email, password, name });
+    const data = await authApi.createUser({ email, password, name });
     localStorage.setItem('token', data.token);
     set({ user: data.user, token: data.token });
   },

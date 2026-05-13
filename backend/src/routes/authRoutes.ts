@@ -4,8 +4,8 @@ import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/register', register);
 router.post('/login', login);
+router.post('/register', authenticate, authorize('ADMIN'), register);
 router.get('/me', authenticate, getMe);
 router.put('/me', authenticate, updateProfile);
 router.put('/me/password', authenticate, changePassword);

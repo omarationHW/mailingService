@@ -14,7 +14,7 @@ import {
   getSequenceAnalytics,
   exportSequenceReport,
 } from '../controllers/sequenceController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -23,19 +23,19 @@ router.use(authenticate);
 
 // Sequence CRUD
 router.get('/', getSequences);
-router.post('/', createSequence);
 router.get('/:id', getSequence);
-router.put('/:id', updateSequence);
-router.delete('/:id', deleteSequence);
+router.post('/', authorize('ADMIN', 'EDITOR'), createSequence);
+router.put('/:id', authorize('ADMIN', 'EDITOR'), updateSequence);
+router.delete('/:id', authorize('ADMIN', 'EDITOR'), deleteSequence);
 
 // Manage sequence steps
-router.put('/:id/steps', updateSequenceSteps);
+router.put('/:id/steps', authorize('ADMIN', 'EDITOR'), updateSequenceSteps);
 
 // Manage enrollments
-router.post('/:id/enroll', enrollContacts);
+router.post('/:id/enroll', authorize('ADMIN', 'EDITOR'), enrollContacts);
 router.get('/:id/enroll-by-tags/preview', previewEnrollByTags);
-router.post('/:id/enroll-by-tags', enrollByTags);
-router.delete('/:id/contacts/:contactId', unenrollContact);
+router.post('/:id/enroll-by-tags', authorize('ADMIN', 'EDITOR'), enrollByTags);
+router.delete('/:id/contacts/:contactId', authorize('ADMIN', 'EDITOR'), unenrollContact);
 router.get('/:id/enrollments', getEnrollments);
 
 // Analytics
