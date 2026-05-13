@@ -1,5 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, Component, ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Algo salió mal. Por favor recarga la página.</p>
+            <button onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700">
+              Recargar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useAuthStore } from './store/authStore';
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
@@ -26,6 +50,7 @@ export default function App() {
   }, [checkAuth]);
 
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -56,5 +81,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+    </ErrorBoundary>
   );
 }
