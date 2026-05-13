@@ -30,13 +30,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetch: async () => {
     set({ loading: true });
     try {
-      const [campaignResult, sequenceResult] = await Promise.allSettled([
-        campaignsApi.getAll({ limit: 50 }),
-        sequencesApi.getAll({ limit: 50 }),
-      ]);
-
-      const campaignData = campaignResult.status === 'fulfilled' ? campaignResult.value : null;
-      const sequenceData = sequenceResult.status === 'fulfilled' ? sequenceResult.value : null;
+      let campaignData: any = null;
+      let sequenceData: any = null;
+      try {
+        const [cr, sr] = await Promise.allSettled([
+          campaignsApi.getAll({ limit: 50 }),
+          sequencesApi.getAll({ limit: 50 }),
+        ]);
+        campaignData = cr.status === 'fulfilled' ? cr.value : null;
+        sequenceData = sr.status === 'fulfilled' ? sr.value : null;
+      } catch { /* api unreachable */ }
 
       const notes: AppNotification[] = [];
       const now = new Date();
