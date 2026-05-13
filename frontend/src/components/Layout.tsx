@@ -30,8 +30,8 @@ export default function Layout() {
 
   // Fetch notifications on mount and every 5 minutes
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5 * 60 * 1000);
+    fetchNotifications().catch(() => {});
+    const interval = setInterval(() => fetchNotifications().catch(() => {}), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
